@@ -1,0 +1,4 @@
+# Configuration
+Config.xcconfig
+*.xcconfig
+!Config-Template.xcconfig
