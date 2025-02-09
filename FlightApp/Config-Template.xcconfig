@@ -1,0 +1,11 @@
+//
+//  Config-Template.xcconfig
+//  FlightApp
+//
+//  Created by Kush Shah on 2/9/25.
+//
+
+// Configuration settings file format documentation can be found at:
+// https://help.apple.com/xcode/#/dev745c5c974
+
+AERO_API_KEY = insert_key_here
