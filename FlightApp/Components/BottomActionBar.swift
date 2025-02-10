@@ -12,37 +12,42 @@ struct BottomActionBar: View {
     @Binding var isPointsPresented: Bool
     
     var body: some View {
-        HStack(spacing: 20) {
-            Button(action: { isExplorePresented.toggle() }) {
-                ActionButton(icon: "map.fill", title: "Explore")
-            }
+        HStack(spacing: 32) {
+            ActionBarButton(
+                icon: "map.fill",
+                title: "Explore",
+                action: { isExplorePresented.toggle() }
+            )
             
-            Button(action: { isPointsPresented.toggle() }) {
-                ActionButton(icon: "star.fill", title: "Points")
-            }
+            ActionBarButton(
+                icon: "star.fill",
+                title: "Points",
+                action: { isPointsPresented.toggle() }
+            )
         }
-        .padding(.vertical, 8)
-        .padding(.horizontal, 20)
+        .padding(.vertical, 12)
+        .padding(.horizontal, 24)
         .background(.ultraThinMaterial)
         .cornerRadius(32)
-        .shadow(radius: 10)
-        .padding(.bottom)
+        .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
     }
 }
 
-struct ActionButton: View {
+struct ActionBarButton: View {
     let icon: String
     let title: String
+    let action: () -> Void
     
     var body: some View {
-        HStack {
-            Image(systemName: icon)
-                .font(.system(size: 18))
-            Text(title)
-                .font(.system(size: 16, weight: .medium))
+        Button(action: action) {
+            VStack(spacing: 4) {
+                Image(systemName: icon)
+                    .font(.system(size: 22))
+                Text(title)
+                    .font(.system(size: 12, weight: .medium))
+            }
+            .foregroundStyle(.primary)
+            .contentShape(Rectangle())
         }
-        .foregroundColor(.primary)
-        .padding(.vertical, 12)
-        .padding(.horizontal, 20)
     }
 }
