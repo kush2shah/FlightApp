@@ -48,7 +48,7 @@ class AeroAPIService {
         return ""
     }
     
-    func getFlightInfo(_ flightNumber: String) async throws -> AeroFlightResponse {
+    func getFlightInfo(_ flightNumber: String) async throws -> AeroAPIResponse {
         // Clean the flight number
         let cleanedNumber = flightNumber.uppercased().trimmingCharacters(in: .whitespacesAndNewlines)
         
@@ -68,9 +68,9 @@ class AeroAPIService {
         print("🔍 Fetching flight info for: \(cleanedNumber)")
         
         do {
-            let (data, response) = try await URLSession.shared.data(for: request)
+            let (data, urlResponse) = try await URLSession.shared.data(for: request)
             
-            guard let httpResponse = response as? HTTPURLResponse else {
+            guard let httpResponse = urlResponse as? HTTPURLResponse else {
                 throw AeroAPIError.invalidResponse
             }
             
@@ -96,13 +96,13 @@ class AeroAPIService {
             let decoder = JSONDecoder()
             decoder.dateDecodingStrategy = .iso8601
             
-            let response = try decoder.decode(AeroFlightResponse.self, from: data)
+            let flightResponse = try decoder.decode(AeroAPIResponse.self, from: data)
             
-            if response.flights.isEmpty {
+            if flightResponse.flights.isEmpty {
                 throw AeroAPIError.noFlightsFound
             }
             
-            return response
+            return flightResponse
             
         } catch let decodingError as DecodingError {
             print("❌ Decoding Error: \(decodingError)")

@@ -15,9 +15,17 @@ struct FlightHeader: View {
         VStack(spacing: 16) {
             HStack {
                 VStack(alignment: .leading) {
-                    Text(flight.ident)
-                        .font(.title2)
-                        .fontWeight(.bold)
+                    HStack {
+                        if let operatorName = flight.operatorIata ?? flight.operator_ {
+                            Text(operatorName)
+                                .font(.headline)
+                                .foregroundColor(.secondary)
+                        }
+                        Text(flight.flightNumber ?? flight.ident)
+                            .font(.title2)
+                            .fontWeight(.bold)
+                    }
+                    
                     if let type = flight.aircraftType {
                         Text(type)
                             .font(.subheadline)

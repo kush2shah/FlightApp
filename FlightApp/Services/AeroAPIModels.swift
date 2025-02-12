@@ -7,24 +7,24 @@
 
 import Foundation
 
-// MARK: - Response Models
-struct AeroAPIResponse<T: Codable>: Codable {
-    let data: T
-    let links: Links?
+// MARK: - API Response Types
+struct AeroAPIResponse: Codable {
+    let flights: [AeroFlight]
+    let links: AeroLinks?
     let numPages: Int
     
     enum CodingKeys: String, CodingKey {
-        case data
+        case flights
         case links
         case numPages = "num_pages"
     }
 }
 
-struct Links: Codable {
+struct AeroLinks: Codable {
     let next: String?
 }
 
-// MARK: - Flight Models
+// MARK: - Flight Model
 struct AeroFlight: Codable, Identifiable {
     let id = UUID()
     let ident: String
@@ -55,7 +55,7 @@ struct AeroFlight: Codable, Identifiable {
     let gateDestination: String?
     let terminalOrigin: String?
     let terminalDestination: String?
-    let type: FlightType
+    let flightType: FlightCategory
     let scheduledOut: String?
     let estimatedOut: String?
     let actualOut: String?
@@ -102,7 +102,7 @@ struct AeroFlight: Codable, Identifiable {
         case gateDestination = "gate_destination"
         case terminalOrigin = "terminal_origin"
         case terminalDestination = "terminal_destination"
-        case type
+        case flightType = "type"
         case scheduledOut = "scheduled_out"
         case estimatedOut = "estimated_out"
         case actualOut = "actual_out"
@@ -122,6 +122,7 @@ struct AeroFlight: Codable, Identifiable {
     }
 }
 
+// MARK: - Supporting Types
 struct AeroAirport: Codable {
     let code: String
     let codeIcao: String?
@@ -140,28 +141,7 @@ struct AeroAirport: Codable {
     }
 }
 
-enum FlightType: String, Codable {
+enum FlightCategory: String, Codable {
     case generalAviation = "General_Aviation"
     case airline = "Airline"
-}
-
-// MARK: - Position Models
-struct AeroPosition: Codable {
-    let altitude: Int
-    let groundspeed: Int
-    let heading: Int?
-    let latitude: Double
-    let longitude: Double
-    let timestamp: String
-    let updateType: String?
-    
-    enum CodingKeys: String, CodingKey {
-        case altitude
-        case groundspeed
-        case heading
-        case latitude
-        case longitude
-        case timestamp
-        case updateType = "update_type"
-    }
 }

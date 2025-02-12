@@ -9,7 +9,7 @@ import SwiftUI
 
 @MainActor
 class FlightViewModel: ObservableObject {
-    @Published var flightDetails: AeroFlightDetails?
+    @Published var currentFlight: AeroFlight?
     @Published var isLoading = false
     @Published var error: Error?
     
@@ -24,7 +24,7 @@ class FlightViewModel: ObservableObject {
                 
                 if let flight = response.flights.first {
                     print("✅ Found flight: \(flight.ident)")
-                    self.flightDetails = flight
+                    self.currentFlight = flight
                 } else {
                     print("⚠️ No flights found in response")
                     self.error = AeroAPIError.noFlightsFound
@@ -39,7 +39,7 @@ class FlightViewModel: ObservableObject {
     }
     
     func getFlightStatus() -> (status: String, color: Color) {
-        guard let flight = flightDetails else {
+        guard let flight = currentFlight else {
             return ("Unknown", .secondary)
         }
         
@@ -67,14 +67,23 @@ class FlightViewModel: ObservableObject {
         return ("Scheduled", .green)
     }
     
-    func getFormattedTime(_ timestamp: String?) -> String {
+    func getFlightTimes() -> (departure: String, arrival: String) {
+        guard let flight = currentFlight else {
+            return ("TBD", "TBD")
+        }
+        
+        let departureTime = formatTime(flight.actualOff ?? flight.estimatedOff ?? flight.scheduledOff)
+        let arrivalTime = formatTime(flight.actualOn ?? flight.estimatedOn ?? flight.scheduledOn)
+        
+        return (departureTime, arrivalTime)
+    }
+    
+    private func formatTime(_ timestamp: String?) -> String {
         guard let timestamp = timestamp else { return "TBD" }
         
-        // Create date formatter for parsing API timestamps
         let apiFormatter = ISO8601DateFormatter()
         apiFormatter.formatOptions = [.withInternetDateTime]
         
-        // Create formatter for displaying times
         let displayFormatter = DateFormatter()
         displayFormatter.dateFormat = "HH:mm"
         
@@ -83,17 +92,5 @@ class FlightViewModel: ObservableObject {
         }
         
         return "TBD"
-    }
-    
-    func getFlightTimes() -> (departure: String, arrival: String) {
-        guard let flight = flightDetails else {
-            return ("TBD", "TBD")
-        }
-        
-        // Use actual times if available, fall back to estimated, then scheduled
-        let departureTime = getFormattedTime(flight.actualOff ?? flight.estimatedOff ?? flight.scheduledOff)
-        let arrivalTime = getFormattedTime(flight.actualOn ?? flight.estimatedOn ?? flight.scheduledOn)
-        
-        return (departureTime, arrivalTime)
     }
 }
