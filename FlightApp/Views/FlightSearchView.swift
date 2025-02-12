@@ -7,114 +7,154 @@
 
 import SwiftUI
 
-// Make String identifiable for sheet presentation
-extension String: Identifiable {
-    public var id: String { self }
-}
-
 struct FlightSearchView: View {
     @State private var searchText = ""
-    @State private var isFlightSheetPresented = false
-    @State private var selectedFlight: String?
+    @State private var selectedFlightNumber: IdentifiableString?
     @FocusState private var isSearchFocused: Bool
     
-    // Simplified data structure for quick testing
-    let commonCarriers = [
-        "United": ["UA837", "UA60", "UA106"],
-        "Singapore": ["SQ12", "SQ31", "SQ11"],
-        "American": ["AA100", "AA137", "AA187"]
-    ]
+    @StateObject private var recentSearchStore = RecentSearchStore()
     
-    private var isValidFlightNumber: Bool {
-        // 2-3 characters followed by 1-4 digits
-        let pattern = "^[A-Z0-9]{2,3}[0-9]{1,4}$"
-        let predicate = NSPredicate(format: "SELF MATCHES %@", pattern)
-        return predicate.evaluate(with: searchText.uppercased())
-    }
-    
-    private func searchFlight() {
-        guard isValidFlightNumber else { return }
+    private var searchResults: [PopularRoute] {
+        guard !searchText.isEmpty else { return PopularRouteStore.routes }
         
-        selectedFlight = searchText
-        isFlightSheetPresented = true
-        isSearchFocused = false
+        return PopularRouteStore.routes.filter { route in
+            route.flightNumber.localizedCaseInsensitiveContains(searchText) ||
+            route.originCode.localizedCaseInsensitiveContains(searchText) ||
+            route.destinationCode.localizedCaseInsensitiveContains(searchText)
+        }
     }
     
     var body: some View {
-        NavigationView {
-            List {
-                searchSection
-                commonFlightsSection
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 20) {
+                    // Search Bar
+                    searchBarSection
+                    
+                    // Recent Searches
+                    if !recentSearchStore.recentSearches.isEmpty {
+                        recentSearchesSection
+                    }
+                    
+                    // Popular Routes
+                    popularRoutesSection
+                }
+                .padding()
             }
             .navigationTitle("Track Flight")
-            .sheet(item: $selectedFlight) { flightNumber in
-                FlightView(flightNumber: flightNumber)
+            .sheet(item: $selectedFlightNumber) { identifiableFlightNumber in
+                FlightView(flightNumber: identifiableFlightNumber.value)
                     .presentationDragIndicator(.visible)
             }
         }
     }
     
-    private var searchSection: some View {
-        Section {
-            HStack {
-                TextField("Flight Number (e.g., UA837)", text: $searchText)
-                    .textInputAutocapitalization(.characters)
-                    .autocorrectionDisabled()
-                    .focused($isSearchFocused)
-                    .submitLabel(.search)
-                    .onChange(of: searchText) { _, newValue in
-                        // Uppercase conversion without forced text case
-                        searchText = newValue.uppercased()
-                    }
-                    .onSubmit(searchFlight)
-                
-                if !searchText.isEmpty {
-                    Button(action: searchFlight) {
-                        Image(systemName: "magnifyingglass")
-                            .foregroundColor(.blue)
-                    }
-                    .buttonStyle(PlainButtonStyle())
-                }
-            }
-        }
-    }
-    
-    private var commonFlightsSection: some View {
-        Section("Common Carriers") {
-            ForEach(Array(commonCarriers.keys.sorted()), id: \.self) { carrier in
-                carrierRow(carrier)
-            }
-        }
-    }
-    
-    private func carrierRow(_ carrier: String) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(carrier)
-                .font(.subheadline)
+    private var searchBarSection: some View {
+        HStack {
+            Image(systemName: "magnifyingglass")
                 .foregroundColor(.secondary)
             
+            TextField("Enter flight number", text: $searchText)
+                .textInputAutocapitalization(.characters)
+                .autocorrectionDisabled()
+                .focused($isSearchFocused)
+                .onSubmit(searchFlight)
+        }
+        .padding()
+        .background(Color.secondary.opacity(0.1))
+        .cornerRadius(12)
+    }
+    
+    private var recentSearchesSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Recent Searches")
+                .font(.headline)
+            
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    if let flights = commonCarriers[carrier] {
-                        ForEach(flights, id: \.self) { flight in
-                            Button(action: {
-                                searchText = flight
-                                selectedFlight = flight
-                                isSearchFocused = false
-                            }) {
-                                Text(flight)
-                                    .padding(.horizontal, 12)
-                                    .padding(.vertical, 8)
-                                    .background(Color.blue.opacity(0.1))
-                                    .cornerRadius(8)
-                            }
+                HStack(spacing: 10) {
+                    ForEach(recentSearchStore.recentSearches) { search in
+                        Button(action: {
+                            selectRecentSearch(search)
+                        }) {
+                            Text(search.route)
+                                .padding(8)
+                                .background(Color.blue.opacity(0.1))
+                                .cornerRadius(8)
+                                .foregroundColor(.blue)
                         }
                     }
                 }
             }
         }
-        .padding(.vertical, 4)
     }
+    
+    private var popularRoutesSection: some View {
+        VStack(alignment: .leading, spacing: 15) {
+            Text("Popular Routes")
+                .font(.headline)
+            
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 15) {
+                ForEach(searchResults) { route in
+                    Button(action: {
+                        selectRoute(route)
+                    }) {
+                        VStack(spacing: 8) {
+                            HStack(spacing: 8) {
+                                Text(route.originFlag)
+                                Text(route.originCode)
+                                    .font(.caption)
+                                
+                                Image(systemName: "arrow.right")
+                                    .foregroundColor(.secondary)
+                                
+                                Text(route.destinationFlag)
+                                Text(route.destinationCode)
+                                    .font(.caption)
+                            }
+                            
+                            Text(route.flightNumber)
+                                .font(.headline)
+                                .foregroundColor(.blue)
+                        }
+                        .padding()
+                        .background(Color.secondary.opacity(0.1))
+                        .cornerRadius(12)
+                    }
+                }
+            }
+        }
+    }
+    
+    private func searchFlight() {
+        guard !searchText.isEmpty else { return }
+        
+        selectedFlightNumber = IdentifiableString(value: searchText)
+        addToRecentSearches()
+        isSearchFocused = false
+        searchText = "" // Clear search text after submission
+    }
+    
+    private func selectRoute(_ route: PopularRoute) {
+        selectedFlightNumber = IdentifiableString(value: route.flightNumber)
+        addToRecentSearches()
+        isSearchFocused = false
+    }
+    
+    private func selectRecentSearch(_ search: RecentSearch) {
+        selectedFlightNumber = IdentifiableString(value: search.route)
+        addToRecentSearches()
+        isSearchFocused = false
+    }
+    
+    private func addToRecentSearches() {
+        guard let flightNumber = selectedFlightNumber?.value else { return }
+        recentSearchStore.addSearch(flightNumber)
+    }
+}
+
+struct IdentifiableString: Identifiable {
+    let id = UUID()
+    let value: String
 }
 
 #Preview {

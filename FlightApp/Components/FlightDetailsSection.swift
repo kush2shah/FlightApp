@@ -75,12 +75,14 @@ struct FlightInformationCard: View {
                 .font(.headline)
             
             VStack(spacing: 12) {
-                DetailRow(title: "Distance", value: "\(distance) mi")
+                DetailRow(icon: "map", title: "Distance", value: "\(distance) mi")
+                
                 if let speed = flight.filedAirspeed {
-                    DetailRow(title: "Speed", value: "\(speed) kts")
+                    DetailRow(icon: "speedometer", title: "Speed", value: "\(speed) kts")
                 }
+                
                 if let altitude = flight.filedAltitude {
-                    DetailRow(title: "Altitude", value: "FL\(altitude)")
+                    DetailRow(icon: "arrow.up.and.down", title: "Altitude", value: "FL\(altitude)")
                 }
             }
         }
@@ -91,17 +93,3 @@ struct FlightInformationCard: View {
     }
 }
 
-struct DetailRow: View {
-    let title: String
-    let value: String
-    
-    var body: some View {
-        HStack {
-            Text(title)
-                .foregroundColor(.secondary)
-            Spacer()
-            Text(value)
-                .fontWeight(.medium)
-        }
-    }
-}

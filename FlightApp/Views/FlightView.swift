@@ -14,27 +14,40 @@ struct FlightView: View {
     
     var body: some View {
         NavigationStack {
-            ZStack {
-                if let flight = viewModel.currentFlight {
-                    FlightContent(
-                        flight: flight,
-                        status: viewModel.getFlightStatus(),
-                        times: viewModel.getFlightTimes()
-                    )
-                } else if viewModel.isLoading {
-                    LoadingView(flightNumber: flightNumber)
-                } else if let error = viewModel.error {
-                    FlightErrorView(
-                        flightNumber: flightNumber,
-                        errorMessage: error.localizedDescription,
-                        onRetry: {
-                            viewModel.searchFlight(flightNumber: flightNumber)
-                        },
-                        onBack: {
-                            dismiss()
+            ScrollView {
+                VStack(spacing: 20) {
+                    if let flight = viewModel.currentFlight {
+                        FlightHeaderView(flight: flight)
+                        
+                        FlightStatusView(flight: flight)
+                        
+                        FlightRouteCard(
+                            flight: flight,
+                            times: (
+                                departure: viewModel.getFlightTimes().departure,
+                                arrival: viewModel.getFlightTimes().arrival
+                            )
+                        )
+                        
+                        if !flight.cancelled {
+                            FlightDetailsSection(flight: flight)
                         }
-                    )
+                    } else if viewModel.isLoading {
+                        LoadingView(flightNumber: flightNumber)
+                    } else if let error = viewModel.error {
+                        FlightErrorView(
+                            flightNumber: flightNumber,
+                            errorMessage: error.localizedDescription,
+                            onRetry: {
+                                viewModel.searchFlight(flightNumber: flightNumber)
+                            },
+                            onBack: {
+                                dismiss()
+                            }
+                        )
+                    }
                 }
+                .padding()
             }
             .navigationTitle("Flight \(flightNumber)")
             .navigationBarTitleDisplayMode(.inline)
@@ -45,22 +58,33 @@ struct FlightView: View {
     }
 }
 
-struct FlightContent: View {
+struct FlightHeaderView: View {
     let flight: AeroFlight
-    let status: (status: String, color: Color)
-    let times: (departure: String, arrival: String)
     
     var body: some View {
-        ScrollView {
-            VStack(spacing: 32) {
-                FlightHeader(flight: flight, status: status)
-                FlightRouteCard(flight: flight, times: times)
-                
-                if !flight.cancelled {
-                    FlightDetailsSection(flight: flight)
+        VStack(spacing: 12) {
+            HStack {
+                VStack(alignment: .leading) {
+                    HStack {
+                        if let operatorName = flight.operatorIata ?? flight.operator_ {
+                            Text(operatorName)
+                                .font(.headline)
+                                .foregroundColor(.secondary)
+                        }
+                        Text(flight.flightNumber ?? flight.ident)
+                            .font(.title2)
+                            .fontWeight(.bold)
+                    }
+                    
+                    if let type = flight.aircraftType {
+                        Text(type)
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
                 }
+                
+                Spacer()
             }
-            .padding(.vertical)
         }
     }
 }
@@ -72,7 +96,7 @@ struct LoadingView: View {
         VStack(spacing: 16) {
             ProgressView()
                 .scaleEffect(1.5)
-            Text("Looking for flight \(flightNumber)...")
+            Text("Searching for flight \(flightNumber)...")
                 .foregroundColor(.secondary)
         }
     }
