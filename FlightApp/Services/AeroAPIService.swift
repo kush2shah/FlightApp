@@ -7,11 +7,33 @@
 
 import Foundation
 
-enum AeroAPIError: Error {
+enum AeroAPIError: LocalizedError {
     case invalidURL
     case invalidResponse
     case decodingError
     case networkError(Error)
+    case noFlightsFound
+    case rateLimitExceeded
+    case serverError(Int)
+    
+    var errorDescription: String? {
+        switch self {
+        case .invalidURL:
+            return "Invalid URL format"
+        case .invalidResponse:
+            return "Invalid response from server"
+        case .decodingError:
+            return "Error processing flight data"
+        case .networkError(let error):
+            return "Network error: \(error.localizedDescription)"
+        case .noFlightsFound:
+            return "No flights found"
+        case .rateLimitExceeded:
+            return "API rate limit exceeded. Please try again later."
+        case .serverError(let code):
+            return "Server error (\(code)). Please try again later."
+        }
+    }
 }
 
 class AeroAPIService {
@@ -20,132 +42,76 @@ class AeroAPIService {
     
     private var apiKey: String {
         if let apiKey = Bundle.main.object(forInfoDictionaryKey: "AERO_API_KEY") as? String {
-            print("📝 Raw API key value: '\(apiKey)'")  // Added quotes to see if we're getting whitespace
-            if apiKey.contains("$(AERO_API_KEY)") {
-                print("⚠️ Variable substitution failed - still seeing $(AERO_API_KEY)")
-            }
-            return apiKey
+            return apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
         }
         print("❌ No API key found in Info.plist")
         return ""
     }
     
-    func searchFlight(_ flightNumber: String) async throws -> AeroFlightSearchResponse {
-        let query = "-idents \(flightNumber)"
-        guard let queryEncoded = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
-              let url = URL(string: "\(baseURL)/flights/search?query=\(queryEncoded)&max_pages=1") else {
+    func getFlightInfo(_ flightNumber: String) async throws -> AeroFlightResponse {
+        // Clean the flight number
+        let cleanedNumber = flightNumber.uppercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        // Create URL with query parameters
+        var urlComponents = URLComponents(string: "\(baseURL)/flights/\(cleanedNumber)")
+        urlComponents?.queryItems = [
+            URLQueryItem(name: "max_pages", value: "1")
+        ]
+        
+        guard let url = urlComponents?.url else {
             throw AeroAPIError.invalidURL
         }
         
         var request = URLRequest(url: url)
         request.setValue(apiKey, forHTTPHeaderField: "x-apikey")
         
-        print("🔍 Request URL: \(url)")
-        print("🔑 API Key length: \(apiKey.count)")
-        
-        let (data, response) = try await URLSession.shared.data(for: request)
-        
-        if let httpResponse = response as? HTTPURLResponse {
-            print("📡 Response Status Code: \(httpResponse.statusCode)")
-        }
-        
-        // Log raw response
-        if let responseString = String(data: data, encoding: .utf8) {
-            print("📦 Raw Response: \(responseString)")
-        }
-        
-        guard let httpResponse = response as? HTTPURLResponse,
-              (200...299).contains(httpResponse.statusCode) else {
-            throw AeroAPIError.invalidResponse
-        }
+        print("🔍 Fetching flight info for: \(cleanedNumber)")
         
         do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            
+            guard let httpResponse = response as? HTTPURLResponse else {
+                throw AeroAPIError.invalidResponse
+            }
+            
+            print("📡 Response Status Code: \(httpResponse.statusCode)")
+            
+            // Log raw response for debugging
+            if let responseString = String(data: data, encoding: .utf8) {
+                print("📦 Raw Response: \(responseString)")
+            }
+            
+            // Handle error responses
+            guard (200...299).contains(httpResponse.statusCode) else {
+                switch httpResponse.statusCode {
+                case 404:
+                    throw AeroAPIError.noFlightsFound
+                case 429:
+                    throw AeroAPIError.rateLimitExceeded
+                default:
+                    throw AeroAPIError.serverError(httpResponse.statusCode)
+                }
+            }
+            
             let decoder = JSONDecoder()
-            return try decoder.decode(AeroFlightSearchResponse.self, from: data)
-        } catch {
-            print("❌ Decoding Error: \(error)")
+            decoder.dateDecodingStrategy = .iso8601
+            
+            let response = try decoder.decode(AeroFlightResponse.self, from: data)
+            
+            if response.flights.isEmpty {
+                throw AeroAPIError.noFlightsFound
+            }
+            
+            return response
+            
+        } catch let decodingError as DecodingError {
+            print("❌ Decoding Error: \(decodingError)")
             throw AeroAPIError.decodingError
+        } catch {
+            if let aeroError = error as? AeroAPIError {
+                throw aeroError
+            }
+            throw AeroAPIError.networkError(error)
         }
-    }
-}
-
-// Response models that match the API spec
-struct AeroFlightSearchResponse: Codable {
-    let flights: [AeroFlight]
-    let numPages: Int
-    let links: AeroLinks?  // Make links optional
-    
-    enum CodingKeys: String, CodingKey {
-        case flights
-        case numPages = "num_pages"
-        case links
-    }
-}
-
-struct AeroLinks: Codable {
-    let next: String?  // Make next optional too since it might be null
-}
-
-struct AeroFlight: Codable {
-    let ident: String
-    let identIcao: String?
-    let identIata: String?
-    let faFlightId: String
-    let registration: String?
-    let origin: AeroAirport
-    let destination: AeroAirport
-    let lastPosition: AeroPosition?
-    let aircraftType: String?
-    let actualOff: String?
-    let actualOn: String?
-    
-    enum CodingKeys: String, CodingKey {
-        case ident
-        case identIcao = "ident_icao"
-        case identIata = "ident_iata"
-        case faFlightId = "fa_flight_id"
-        case registration
-        case origin
-        case destination
-        case lastPosition = "last_position"
-        case aircraftType = "aircraft_type"
-        case actualOff = "actual_off"
-        case actualOn = "actual_on"
-    }
-}
-
-struct AeroAirport: Codable {
-    let code: String
-    let codeIcao: String?
-    let codeIata: String?
-    let timezone: String
-    let name: String
-    let city: String
-    
-    enum CodingKeys: String, CodingKey {
-        case code
-        case codeIcao = "code_icao"
-        case codeIata = "code_iata"
-        case timezone
-        case name
-        case city
-    }
-}
-
-struct AeroPosition: Codable {
-    let altitude: Int
-    let groundspeed: Int
-    let heading: Int
-    let latitude: Double
-    let longitude: Double
-    let timestamp: String
-    
-    enum CodingKeys: String, CodingKey {
-        case altitude
-        case groundspeed
-        case heading
-        case latitude
-        case longitude
-        case timestamp
     }
 }

@@ -8,64 +8,148 @@
 import SwiftUI
 
 struct FlightView: View {
+    @Environment(\.dismiss) private var dismiss
     @StateObject private var viewModel = FlightViewModel()
     let flightNumber: String
     
     var body: some View {
-        ScrollView {
-            VStack(spacing: 32) {
-                // Main flight card with route visualization
-                if let flight = viewModel.currentFlight {
-                    FlightRouteCard(flight: flight)
-                        .padding(.horizontal)
-                    
-                    // Flight stats if we have position data
-                    if let position = flight.lastPosition {
-                        FlightStatsSection(position: position)
+        ZStack {
+            if let flight = viewModel.currentFlight {
+                ScrollView {
+                    VStack(spacing: 32) {
+                        FlightRouteCard(flight: flight)
+                            .padding(.horizontal)
+                        
+                        if let position = flight.lastPosition {
+                            FlightStatsSection(position: position)
+                                .padding(.horizontal)
+                        }
+                        
+                        FlightTimelineSection(flight: flight)
+                            .padding(.horizontal)
+                        
+                        WeatherSection(city: flight.destination.city)
                             .padding(.horizontal)
                     }
-                    
-                    // Timeline of events
-                    FlightTimelineSection(flight: flight)
-                        .padding(.horizontal)
-                    
-                    // Weather at destination
-                    WeatherSection(city: flight.destination.city)
-                        .padding(.horizontal)
-                } else if viewModel.isLoading {
+                    .padding(.top)
+                    .padding(.bottom, 100)
+                }
+            } else if viewModel.isLoading {
+                VStack(spacing: 16) {
                     ProgressView()
-                        .padding()
-                } else if viewModel.noFlightsFound {
-                    VStack(spacing: 12) {
-                        Image(systemName: "airplane.circle")
-                            .font(.system(size: 48))
-                            .foregroundColor(.secondary)
-                        Text("No Active Flights Found")
-                            .font(.headline)
-                        Text("Flight \(flightNumber) is not currently in the air")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                            .multilineTextAlignment(.center)
+                        .scaleEffect(1.5)
+                    Text("Looking for flight \(flightNumber)...")
+                        .foregroundColor(.secondary)
+                }
+            } else if viewModel.noFlightsFound || viewModel.error != nil {
+                FlightErrorView(
+                    flightNumber: flightNumber,
+                    errorMessage: viewModel.error?.localizedDescription ?? "Flight \(flightNumber) is not currently active",
+                    onRetry: {
+                        viewModel.searchFlight(flightNumber: flightNumber)
                     }
-                    .padding()
-                } else if let error = viewModel.error {
-                    VStack(spacing: 12) {
-                        Text("Unable to load flight information")
-                            .font(.headline)
-                            .foregroundColor(.secondary)
-                        Text(error.localizedDescription)
-                            .font(.subheadline)
-                            .foregroundColor(.red)
-                            .multilineTextAlignment(.center)
+                )
+            }
+        }
+        .navigationBarBackButtonHidden(true)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button(action: { dismiss() }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "chevron.left")
+                        Text("Back")
                     }
-                    .padding()
                 }
             }
-            .padding(.top)
-            .padding(.bottom, 100) // Add extra padding for bottom bar
         }
         .onAppear {
             viewModel.searchFlight(flightNumber: flightNumber)
+        }
+    }
+}
+
+struct FlightErrorView: View {
+    let flightNumber: String
+    let errorMessage: String
+    let onRetry: () -> Void
+    
+    var body: some View {
+        VStack(spacing: 24) {
+            // Error icon
+            Circle()
+                .fill(Color.red.opacity(0.1))
+                .frame(width: 80, height: 80)
+                .overlay(
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 32))
+                        .foregroundColor(.red)
+                )
+            
+            // Error message
+            VStack(spacing: 8) {
+                Text("Flight Not Found")
+                    .font(.title2)
+                    .fontWeight(.semibold)
+                Text(errorMessage)
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+            }
+            
+            // Suggestions card
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Try:")
+                    .font(.headline)
+                
+                VStack(alignment: .leading, spacing: 12) {
+                    SuggestionRow(
+                        icon: "clock.arrow.circlepath",
+                        text: "Checking back closer to the scheduled departure time"
+                    )
+                    
+                    SuggestionRow(
+                        icon: "magnifyingglass",
+                        text: "Verifying the flight number format (e.g., UA837 or SQ31)"
+                    )
+                }
+            }
+            .padding()
+            .background(Color(.systemBackground))
+            .cornerRadius(16)
+            .shadow(radius: 5)
+            
+            // Action buttons
+            VStack(spacing: 12) {
+                Button(action: onRetry) {
+                    Text("Try Again")
+                        .font(.headline)
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color.blue)
+                        .cornerRadius(12)
+                }
+            }
+            .padding(.top)
+        }
+        .padding()
+    }
+}
+
+struct SuggestionRow: View {
+    let icon: String
+    let text: String
+    
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: 20))
+                .foregroundColor(.blue)
+                .frame(width: 24)
+            
+            Text(text)
+                .font(.subheadline)
+                .foregroundColor(.secondary)
         }
     }
 }
