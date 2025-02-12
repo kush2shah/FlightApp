@@ -14,6 +14,13 @@ class FlightViewModel: ObservableObject {
     @Published var error: Error?
     
     func searchFlight(flightNumber: String) {
+        
+        // Validate input before making API call
+           guard !flightNumber.isEmpty else {
+               self.error = AeroAPIError.invalidURL
+               return
+           }
+        
         isLoading = true
         error = nil
         
@@ -39,33 +46,45 @@ class FlightViewModel: ObservableObject {
     }
     
     func getFlightStatus() -> (status: String, color: Color) {
-        guard let flight = currentFlight else {
-            return ("Unknown", .secondary)
-        }
-        
-        if flight.cancelled {
-            return ("Cancelled", .red)
-        }
-        
-        if flight.diverted {
-            return ("Diverted", .orange)
-        }
-        
-        // Check if flight has departed
-        if flight.actualOff != nil {
+            guard let flight = currentFlight else {
+                return ("Unknown", .secondary)
+            }
+            
+            if flight.cancelled {
+                return ("Cancelled", .red)
+            }
+            
+            if flight.diverted {
+                return ("Diverted", .orange)
+            }
+            
+            // Check if flight is in-progress
+            if flight.isInProgress {
+                let progressPercent = flight.accurateProgressPercent
+                switch progressPercent {
+                case 0..<25:
+                    return ("Departing", .blue)
+                case 25..<75:
+                    return ("In Flight", .green)
+                case 75...100:
+                    return ("Approaching Destination", .orange)
+                default:
+                    return ("In Air", .blue)
+                }
+            }
+            
+            // Check if flight has landed
             if flight.actualOn != nil {
                 return ("Landed", .green)
             }
-            return ("In Air", .blue)
+            
+            // Check if flight is delayed
+            if let delay = flight.departureDelay, delay > 900 { // 15 minutes
+                return ("Delayed", .orange)
+            }
+            
+            return ("Scheduled", .secondary)
         }
-        
-        // Check if flight is delayed
-        if let delay = flight.departureDelay, delay > 900 { // 15 minutes
-            return ("Delayed", .orange)
-        }
-        
-        return ("Scheduled", .green)
-    }
     
     func getFlightTimes() -> (departure: String, arrival: String) {
         guard let flight = currentFlight else {

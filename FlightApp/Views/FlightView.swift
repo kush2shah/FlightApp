@@ -13,7 +13,7 @@ struct FlightView: View {
     let flightNumber: String
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ZStack {
                 if let flight = viewModel.currentFlight {
                     FlightContent(
@@ -36,19 +36,9 @@ struct FlightView: View {
                     )
                 }
             }
+            .navigationTitle("Flight \(flightNumber)")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button(action: { dismiss() }) {
-                        HStack(spacing: 4) {
-                            Image(systemName: "chevron.left")
-                            Text("Back")
-                        }
-                    }
-                }
-            }
         }
-        .navigationViewStyle(.stack)
         .onAppear {
             viewModel.searchFlight(flightNumber: flightNumber)
         }

@@ -7,7 +7,6 @@
 
 import Foundation
 
-// MARK: - API Response Types
 struct AeroAPIResponse: Codable {
     let flights: [AeroFlight]
     let links: AeroLinks?
@@ -24,7 +23,6 @@ struct AeroLinks: Codable {
     let next: String?
 }
 
-// MARK: - Flight Model
 struct AeroFlight: Codable, Identifiable {
     let id = UUID()
     let ident: String
@@ -120,9 +118,69 @@ struct AeroFlight: Codable, Identifiable {
         case blocked
         case positionOnly = "position_only"
     }
+    
+    var isInProgress: Bool {
+        // Explicitly check for in-progress status
+        let inProgressStatuses = [
+            "en route",
+            "in progress",
+            "airborne",
+            "en route / delayed"
+        ]
+        
+        // Check status first
+        if let statusLowercased = status.lowercased() as String?,
+           inProgressStatuses.contains(where: { statusLowercased.contains($0) }) {
+            return true
+        }
+        
+        // Check flight timing conditions
+        guard actualOff != nil, actualOn == nil else {
+            return false
+        }
+        
+        // Parse actual off time
+        guard let offTimeString = actualOff,
+              let dateFormatter = ISO8601DateFormatter().date(from: offTimeString) else {
+            return false
+        }
+        
+        // Consider flight in progress if actual off time is in the past
+        return dateFormatter < Date()
+    }
+    
+    var accurateProgressPercent: Int {
+        // If flight is not in the air, return existing progress or 0
+        guard isInProgress else {
+            return progressPercent ?? 0
+        }
+        
+        // Calculate progress based on flight timing
+        guard let scheduledOff = scheduledOff,
+              let scheduledOn = scheduledOn,
+              let offTime = ISO8601DateFormatter().date(from: scheduledOff),
+              let onTime = ISO8601DateFormatter().date(from: scheduledOn) else {
+            return progressPercent ?? 0
+        }
+        
+        let now = Date()
+        
+        // Calculate total flight duration and elapsed time
+        let totalFlightDuration = onTime.timeIntervalSince(offTime)
+        let elapsedTime = now.timeIntervalSince(offTime)
+        
+        // Calculate progress, ensuring it's between 0 and 100
+        let calculatedProgress = min(max(Int((elapsedTime / totalFlightDuration) * 100), 0), 100)
+        
+        return calculatedProgress
+    }
 }
 
-// MARK: - Supporting Types
+enum FlightCategory: String, Codable {
+    case generalAviation = "General_Aviation"
+    case airline = "Airline"
+}
+
 struct AeroAirport: Codable {
     let code: String
     let codeIcao: String?
@@ -130,6 +188,11 @@ struct AeroAirport: Codable {
     let timezone: String?
     let name: String?
     let city: String?
+    
+    // Prefer IATA code, fallback to ICAO or generic code
+    var displayCode: String {
+        return codeIata ?? codeIcao ?? code
+    }
     
     enum CodingKeys: String, CodingKey {
         case code
@@ -139,9 +202,4 @@ struct AeroAirport: Codable {
         case name
         case city
     }
-}
-
-enum FlightCategory: String, Codable {
-    case generalAviation = "General_Aviation"
-    case airline = "Airline"
 }

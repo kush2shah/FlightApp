@@ -7,14 +7,16 @@
 
 import SwiftUI
 
-// Make String identifiable for fullScreenCover
+// Make String identifiable for sheet presentation
 extension String: Identifiable {
     public var id: String { self }
 }
 
 struct FlightSearchView: View {
     @State private var searchText = ""
+    @State private var isFlightSheetPresented = false
     @State private var selectedFlight: String?
+    @FocusState private var isSearchFocused: Bool
     
     // Simplified data structure for quick testing
     let commonCarriers = [
@@ -24,11 +26,18 @@ struct FlightSearchView: View {
     ]
     
     private var isValidFlightNumber: Bool {
-        guard !searchText.isEmpty else { return false }
         // 2-3 characters followed by 1-4 digits
         let pattern = "^[A-Z0-9]{2,3}[0-9]{1,4}$"
         let predicate = NSPredicate(format: "SELF MATCHES %@", pattern)
         return predicate.evaluate(with: searchText.uppercased())
+    }
+    
+    private func searchFlight() {
+        guard isValidFlightNumber else { return }
+        
+        selectedFlight = searchText
+        isFlightSheetPresented = true
+        isSearchFocused = false
     }
     
     var body: some View {
@@ -38,22 +47,35 @@ struct FlightSearchView: View {
                 commonFlightsSection
             }
             .navigationTitle("Track Flight")
-            .fullScreenCover(item: $selectedFlight) { flightNumber in
+            .sheet(item: $selectedFlight) { flightNumber in
                 FlightView(flightNumber: flightNumber)
+                    .presentationDragIndicator(.visible)
             }
         }
     }
     
     private var searchSection: some View {
         Section {
-            TextField("Flight number (e.g., UA837)", text: $searchText)
-                .textInputAutocapitalization(.characters)
-                .autocorrectionDisabled()
-                .onChange(of: searchText) { _, newValue in
-                    if isValidFlightNumber {
-                        selectedFlight = newValue.uppercased()
+            HStack {
+                TextField("Flight Number (e.g., UA837)", text: $searchText)
+                    .textInputAutocapitalization(.characters)
+                    .autocorrectionDisabled()
+                    .focused($isSearchFocused)
+                    .submitLabel(.search)
+                    .onChange(of: searchText) { _, newValue in
+                        // Uppercase conversion without forced text case
+                        searchText = newValue.uppercased()
                     }
+                    .onSubmit(searchFlight)
+                
+                if !searchText.isEmpty {
+                    Button(action: searchFlight) {
+                        Image(systemName: "magnifyingglass")
+                            .foregroundColor(.blue)
+                    }
+                    .buttonStyle(PlainButtonStyle())
                 }
+            }
         }
     }
     
@@ -75,7 +97,11 @@ struct FlightSearchView: View {
                 HStack(spacing: 8) {
                     if let flights = commonCarriers[carrier] {
                         ForEach(flights, id: \.self) { flight in
-                            Button(action: { searchText = flight }) {
+                            Button(action: {
+                                searchText = flight
+                                selectedFlight = flight
+                                isSearchFocused = false
+                            }) {
                                 Text(flight)
                                     .padding(.horizontal, 12)
                                     .padding(.vertical, 8)
@@ -91,9 +117,6 @@ struct FlightSearchView: View {
     }
 }
 
-// Preview
-struct FlightSearchView_Previews: PreviewProvider {
-    static var previews: some View {
-        FlightSearchView()
-    }
+#Preview {
+    FlightSearchView()
 }

@@ -12,13 +12,14 @@ struct FlightRouteCard: View {
     let times: (departure: String, arrival: String)
     
     var body: some View {
-        VStack(spacing: 24) {
-            // Route Information
+        VStack(alignment: .leading, spacing: 16) {
+            // Origin and Destination
             HStack {
                 VStack(alignment: .leading) {
-                    Text(flight.origin.code)
-                        .font(.system(size: 32, weight: .bold))
-                    Text(flight.origin.city ?? "")
+                    Text(flight.origin.displayCode)
+                        .font(.title2)
+                        .fontWeight(.bold)
+                    Text(flight.origin.city ?? flight.origin.name ?? "")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                 }
@@ -26,55 +27,45 @@ struct FlightRouteCard: View {
                 Spacer()
                 
                 VStack(alignment: .trailing) {
-                    Text(flight.destination.code)
-                        .font(.system(size: 32, weight: .bold))
-                    Text(flight.destination.city ?? "")
+                    Text(flight.destination.displayCode)
+                        .font(.title2)
+                        .fontWeight(.bold)
+                    Text(flight.destination.city ?? flight.destination.name ?? "")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                 }
             }
             
-            // Flight Progress
-            if let progress = flight.progressPercent {
-                ProgressView(value: Double(progress), total: 100)
-                    .tint(.blue)
-            }
-            
-            // Times
-            HStack {
-                VStack(alignment: .leading) {
-                    Text(times.departure)
-                        .font(.title3)
-                        .fontWeight(.medium)
-                    Text("Departure")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
+            // Progress Visualization
+            if flight.isInProgress {
+                VStack(alignment: .leading, spacing: 8) {
+                    ProgressView(value: Double(flight.accurateProgressPercent), total: 100)
+                        .progressViewStyle(LinearProgressViewStyle(tint: .blue))
+                    
+                    HStack {
+                        Text("Departure: \(times.departure)")
+                        Spacer()
+                        Text("Arrival: \(times.arrival)")
+                    }
+                    .font(.caption)
+                    .foregroundColor(.secondary)
                 }
-                
-                Spacer()
-                
-                if let duration = flight.filedEte {
-                    Text("\(duration / 3600)h \((duration % 3600) / 60)m")
-                        .font(.headline)
-                        .foregroundColor(.blue)
+                .padding(.top, 8)
+            } else {
+                // Scheduled flight details
+                HStack {
+                    Text("Departure: \(times.departure)")
+                    Spacer()
+                    Text("Arrival: \(times.arrival)")
                 }
-                
-                Spacer()
-                
-                VStack(alignment: .trailing) {
-                    Text(times.arrival)
-                        .font(.title3)
-                        .fontWeight(.medium)
-                    Text("Arrival")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                }
+                .font(.subheadline)
+                .foregroundColor(.secondary)
             }
         }
-        .padding(24)
+        .padding()
         .background(Color(.systemBackground))
-        .cornerRadius(24)
-        .shadow(radius: 10)
+        .cornerRadius(16)
+        .shadow(radius: 5)
         .padding(.horizontal)
     }
 }
