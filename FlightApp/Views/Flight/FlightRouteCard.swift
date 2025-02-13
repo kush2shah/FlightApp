@@ -12,44 +12,39 @@ struct FlightRouteCard: View {
     let times: (departure: FlightTime, arrival: FlightTime)
     
     var body: some View {
-        VStack(spacing: 24) {
-            // Route information with progress
-            VStack(spacing: 16) {
-                HStack(spacing: 16) {
-                    RouteEndpoint(
-                        code: flight.origin.displayCode,
-                        name: flight.origin.city ?? flight.origin.name ?? "Unknown"
-                    )
-                    
-                    Spacer()
-                    
-                    // Progress bar
-                    if flight.isInProgress {
-                        customProgressBar
-                    }
-                    
-                    Spacer()
-                    
-                    RouteEndpoint(
-                        code: flight.destination.displayCode,
-                        name: flight.destination.city ?? flight.destination.name ?? "Unknown"
-                    )
-                }
+        VStack(alignment: .leading, spacing: 12) {
+            // Route Header
+            HStack {
+                RouteEndpoint(
+                    code: flight.origin.displayCode,
+                    name: flight.origin.city ?? flight.origin.name ?? "Unknown"
+                )
                 
-                // Flight duration
-                if let filed = flight.filedEte {
-                    flightDurationView(duration: filed)
-                }
+                Spacer()
+                
+                RouteEndpoint(
+                    code: flight.destination.displayCode,
+                    name: flight.destination.city ?? flight.destination.name ?? "Unknown"
+                )
             }
             
-            // Time information
-            HStack(spacing: 16) {
+            // Progress Bar
+            if flight.isInProgress {
+                customProgressBar
+            }
+            
+            // Time Information
+            HStack {
                 FlightTimeView(time: times.departure, isArrival: false)
                 
-                Image(systemName: "arrow.right")
-                    .foregroundStyle(.secondary)
+                Spacer()
                 
                 FlightTimeView(time: times.arrival, isArrival: true)
+            }
+            
+            // Flight Duration
+            if let filed = flight.filedEte {
+                flightDurationView(duration: filed)
             }
         }
         .padding()
@@ -69,22 +64,17 @@ struct FlightRouteCard: View {
                 
                 // Progress fill
                 Rectangle()
-                    .fill(progressColor)
+                    .fill(.blue)
                     .frame(width: progressWidth(in: geometry), height: 2)
                 
                 // Airplane icon
                 Image(systemName: "airplane")
-                    .foregroundStyle(progressColor)
+                    .foregroundStyle(.blue)
                     .rotationEffect(.degrees(0))
                     .offset(x: progressWidth(in: geometry) - 10)
             }
         }
         .frame(height: 20)
-    }
-    
-    // Dynamic progress color based on flight status
-    private var progressColor: Color {
-        return .blue
     }
     
     // Calculate progress width based on available geometry
@@ -125,12 +115,13 @@ private struct RouteEndpoint: View {
     var body: some View {
         VStack(alignment: .center, spacing: 4) {
             Text(code)
-                .font(.title2)
+                .font(.headline)
                 .fontWeight(.bold)
             
             Text(name)
                 .font(.caption)
                 .foregroundColor(.secondary)
+                .lineLimit(1)
         }
     }
 }

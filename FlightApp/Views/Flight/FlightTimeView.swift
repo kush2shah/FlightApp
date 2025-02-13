@@ -12,107 +12,98 @@ struct FlightTimeView: View {
     let isArrival: Bool
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                // Main time display
-                VStack(alignment: .leading, spacing: 2) {
-                    mainTimeDisplay
-                    
-                    // Status description
-                    if let status = time.statusDescription {
-                        Text(status)
-                            .font(.caption)
-                            .foregroundColor(statusColor)
-                    }
-                }
-                
-                Spacer()
-                
-                // Timezone
-                Text(time.displayTimezone)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+        HStack(spacing: 8) {
+            // Main time display with comparison
+            VStack(alignment: .leading, spacing: 2) {
+                mainTimeDisplay
+                comparisonTimeDisplay
             }
+            
+            Spacer()
+            
+            // Status indicator
+            statusBadge
         }
-        .padding(12)
+        .padding(8)
         .background(backgroundStyle)
-        .cornerRadius(12)
+        .cornerRadius(8)
         .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .strokeBorder(overlayColor, lineWidth: 1)
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(overlayColor, lineWidth: 1)
         )
     }
     
-    // Main time display with emphasis and strikethrough
+    // Main time display with actual or estimated time
     private var mainTimeDisplay: some View {
         Group {
-            // Arrival view might show estimated vs scheduled
-            if isArrival, let estimatedTime = time.estimatedTime,
-               let scheduledTime = time.scheduledTime,
-               estimatedTime != scheduledTime {
-                HStack(spacing: 8) {
-                    Text(estimatedTime)
-                        .font(.title2)
-                        .fontWeight(.semibold)
-                        .foregroundColor(primaryTimeColor)
-                    
-                    Text(scheduledTime)
-                        .font(.title2)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.secondary)
-                        .strikethrough(true, color: .red)
-                }
+            if let actualTime = time.actualTime {
+                Text(actualTime)
+                    .font(.headline)
+                    .foregroundColor(primaryTimeColor)
             }
-            // Departure view shows actual vs scheduled
-            else if let actualTime = time.actualTime,
-                    let scheduledTime = time.scheduledTime,
-                    actualTime != scheduledTime {
-                HStack(spacing: 8) {
-                    Text(actualTime)
-                        .font(.title2)
-                        .fontWeight(.semibold)
-                        .foregroundColor(primaryTimeColor)
-                    
-                    Text(scheduledTime)
-                        .font(.title2)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.secondary)
-                        .strikethrough(true, color: .red)
-                }
-            }
-            // Fallback to single time display
             else {
-                Text(time.displayTime)
-                    .font(.title2)
-                    .fontWeight(.semibold)
+                Text(time.estimatedTime ?? time.scheduledTime ?? "--:--")
+                    .font(.headline)
                     .foregroundColor(primaryTimeColor)
             }
         }
     }
     
-    // Color for primary time based on status
+    // Comparison display showing scheduled time if different
+    private var comparisonTimeDisplay: some View {
+        Group {
+            // Show scheduled time if it differs from actual/estimated
+            if let actualTime = time.actualTime,
+               let scheduledTime = time.scheduledTime,
+               actualTime != scheduledTime {
+                Text(scheduledTime)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .strikethrough()
+            }
+            else if let estimatedTime = time.estimatedTime,
+                    let scheduledTime = time.scheduledTime,
+                    estimatedTime != scheduledTime {
+                Text(scheduledTime)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .strikethrough()
+            }
+        }
+    }
+    
+    // Status badge showing early/delayed information
+    private var statusBadge: some View {
+        Group {
+            if let difference = time.minutesDifference {
+                HStack(spacing: 4) {
+                    Image(systemName: time.isEarly ? "arrow.down.circle.fill" : "arrow.up.circle.fill")
+                        .foregroundColor(time.isEarly ? .green : .red)
+                    
+                    Text("\(difference)m \(time.isEarly ? "Early" : "Delayed")")
+                        .font(.caption)
+                        .foregroundColor(time.isEarly ? .green : .red)
+                }
+            }
+        }
+    }
+    
+    // Dynamic color based on time status
     private var primaryTimeColor: Color {
         if time.cancelled {
             return .red
         }
-        if time.isEarly {
-            return .green
-        }
+        
+        // Prioritize delay indication for departure
         if time.isDelayed {
             return .red
         }
+        
+        if time.isEarly {
+            return .green
+        }
+        
         return .primary
-    }
-    
-    // Status color
-    private var statusColor: Color {
-        if time.isEarly {
-            return .green
-        }
-        if time.isDelayed {
-            return .red
-        }
-        return .secondary
     }
     
     // Background style based on flight status
@@ -120,12 +111,15 @@ struct FlightTimeView: View {
         if time.cancelled {
             return Color.red.opacity(0.1)
         }
-        if time.isEarly {
-            return Color.green.opacity(0.1)
-        }
+        
         if time.isDelayed {
             return Color.red.opacity(0.1)
         }
+        
+        if time.isEarly {
+            return Color.green.opacity(0.1)
+        }
+        
         return Color.secondary.opacity(0.05)
     }
     
@@ -134,12 +128,70 @@ struct FlightTimeView: View {
         if time.cancelled {
             return Color.red.opacity(0.3)
         }
-        if time.isEarly {
-            return Color.green.opacity(0.3)
-        }
+        
         if time.isDelayed {
             return Color.red.opacity(0.3)
         }
+        
+        if time.isEarly {
+            return Color.green.opacity(0.3)
+        }
+        
         return Color.clear
+    }
+}
+
+#Preview {
+    VStack {
+        // Early departure
+        FlightTimeView(
+            time: FlightTime(
+                displayTime: "14:30",
+                displayTimezone: "EST",
+                actualTime: "14:25",
+                scheduledTime: "14:30",
+                estimatedTime: "14:35",
+                date: "Mar 15",
+                isEarly: true,
+                isDelayed: false,
+                minutesDifference: 5,
+                cancelled: false
+            ),
+            isArrival: false
+        )
+        
+        // Delayed departure
+        FlightTimeView(
+            time: FlightTime(
+                displayTime: "16:45",
+                displayTimezone: "PST",
+                actualTime: nil,
+                scheduledTime: "16:30",
+                estimatedTime: "16:45",
+                date: "Mar 15",
+                isEarly: false,
+                isDelayed: true,
+                minutesDifference: 15,
+                cancelled: false
+            ),
+            isArrival: false
+        )
+        
+        // Delayed arrival
+        FlightTimeView(
+            time: FlightTime(
+                displayTime: "16:45",
+                displayTimezone: "PST",
+                actualTime: nil,
+                scheduledTime: "16:30",
+                estimatedTime: "16:45",
+                date: "Mar 15",
+                isEarly: false,
+                isDelayed: true,
+                minutesDifference: 15,
+                cancelled: false
+            ),
+            isArrival: true
+        )
     }
 }
