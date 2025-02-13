@@ -48,7 +48,7 @@ class AeroAPIService {
         return ""
     }
     
-    func getFlightInfo(_ flightNumber: String) async throws -> AeroAPIResponse {
+    func getFlightInfo(_ flightNumber: String) async throws -> AeroFlight {
         // Clean the flight number
         let cleanedNumber = flightNumber.uppercased().trimmingCharacters(in: .whitespacesAndNewlines)
         
@@ -96,23 +96,20 @@ class AeroAPIService {
                 let decoder = JSONDecoder()
                 decoder.dateDecodingStrategy = .iso8601
                 
-                let flightResponse = try decoder.decode(AeroAPIResponse.self, from: data)
+                // Decode the full response first
+                let flightResponse = try decoder.decode(AeroFlightResponse.self, from: data)
                 
                 // Prioritize in-progress flights
                 let inProgressFlights = flightResponse.flights.filter { $0.isInProgress }
                 
-                if !inProgressFlights.isEmpty {
-                    // If in-progress flights exist, return those
-                    return AeroAPIResponse(
-                        flights: inProgressFlights,
-                        links: flightResponse.links,
-                        numPages: flightResponse.numPages
-                    )
+                // Return the first in-progress flight if available
+                if let inProgressFlight = inProgressFlights.first {
+                    return inProgressFlight
                 }
                 
-                // If no in-progress flights, return all found flights
-                if !flightResponse.flights.isEmpty {
-                    return flightResponse
+                // If no in-progress flights, return the first flight
+                if let firstFlight = flightResponse.flights.first {
+                    return firstFlight
                 }
             } catch {
                 print("Search strategy failed: \(error)")
@@ -124,15 +121,13 @@ class AeroAPIService {
         throw AeroAPIError.noFlightsFound
     }
     
-    // Create a precise search for the exact flight identifier
+    // The search strategy methods remain the same
     private func createPreciseIdentSearch(_ flightNumber: String) -> URLComponents? {
         var urlComponents = URLComponents(string: "\(baseURL)/flights/\(flightNumber)")
         return urlComponents
     }
     
-    // Create a search using ident_iata and flight_number
     private func createAirlineAndNumberSearch(_ flightNumber: String) -> URLComponents? {
-        // Extract airline code and flight number
         guard flightNumber.count >= 3 else { return nil }
         
         let airlineCode = String(flightNumber.prefix(2))
@@ -146,7 +141,6 @@ class AeroAPIService {
         return urlComponents
     }
     
-    // Create a search using a broader matching strategy
     private func createWildcardIdentSearch(_ flightNumber: String) -> URLComponents? {
         var urlComponents = URLComponents(string: "\(baseURL)/flights/search")
         urlComponents?.queryItems = [

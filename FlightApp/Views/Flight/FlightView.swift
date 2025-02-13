@@ -100,6 +100,7 @@ struct LoadingView: View {
                 .foregroundColor(.secondary)
         }
     }
+    
 }
 
 #Preview {
