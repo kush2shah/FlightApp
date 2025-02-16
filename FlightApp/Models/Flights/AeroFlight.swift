@@ -36,6 +36,8 @@ struct AeroFlight: Codable, Identifiable {
     let registration: String?
     let atcIdent: String?
     let inboundFaFlightId: String?
+    let codeshares: [String]?
+    let codeshares_iata: [String]?
     let origin: AeroAirport
     let destination: AeroAirport
     let departureDelay: Int?
@@ -83,6 +85,8 @@ struct AeroFlight: Codable, Identifiable {
         case registration
         case atcIdent = "atc_ident"
         case inboundFaFlightId = "inbound_fa_flight_id"
+        case codeshares
+        case codeshares_iata
         case origin
         case destination
         case departureDelay = "departure_delay"

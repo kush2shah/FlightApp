@@ -48,77 +48,91 @@ class AeroAPIService {
         return ""
     }
     
-    func getFlightInfo(_ flightNumber: String) async throws -> AeroFlight {
+    func getFlightInfo(_ flightNumber: String) async throws -> [AeroFlight] {
         // Clean the flight number
         let cleanedNumber = flightNumber.uppercased().trimmingCharacters(in: .whitespacesAndNewlines)
         
-        // Try multiple search strategies
-        let searchStrategies: [(String) -> URLComponents?] = [
-            createPreciseIdentSearch,
-            createWildcardIdentSearch,
-            createAirlineAndNumberSearch
-        ]
-        
-        for strategy in searchStrategies {
-            guard let urlComponents = strategy(cleanedNumber) else {
-                continue
-            }
-            
-            guard let url = urlComponents.url else {
-                continue
-            }
-            
-            var request = URLRequest(url: url)
-            request.setValue(apiKey, forHTTPHeaderField: "x-apikey")
-            
-            print("🔍 Searching with strategy: \(url)")
-            
-            do {
-                let (data, urlResponse) = try await URLSession.shared.data(for: request)
-                
-                guard let httpResponse = urlResponse as? HTTPURLResponse else {
-                    continue
-                }
-                
-                print("📡 Response Status Code: \(httpResponse.statusCode)")
-                
-                // Log raw response for debugging
-                if let responseString = String(data: data, encoding: .utf8) {
-                    print("📦 Raw Response: \(responseString)")
-                }
-                
-                // Handle error responses
-                guard (200...299).contains(httpResponse.statusCode) else {
-                    print("❗ Search strategy failed with status code: \(httpResponse.statusCode)")
-                    continue
-                }
-                
-                let decoder = JSONDecoder()
-                decoder.dateDecodingStrategy = .iso8601
-                
-                // Decode the full response first
-                let flightResponse = try decoder.decode(AeroFlightResponse.self, from: data)
-                
-                // Prioritize in-progress flights
-                let inProgressFlights = flightResponse.flights.filter { $0.isInProgress }
-                
-                // Return the first in-progress flight if available
-                if let inProgressFlight = inProgressFlights.first {
-                    return inProgressFlight
-                }
-                
-                // If no in-progress flights, return the first flight
-                if let firstFlight = flightResponse.flights.first {
-                    return firstFlight
-                }
-            } catch {
-                print("Search strategy failed: \(error)")
-                continue
-            }
+        // Construct URL for the specific flight endpoint
+        guard var urlComponents = URLComponents(string: "\(baseURL)/flights/\(cleanedNumber)") else {
+            throw AeroAPIError.invalidURL
         }
         
-        // If all strategies fail, throw not found error
-        throw AeroAPIError.noFlightsFound
+        // Add parameters for latest flights
+        let now = ISO8601DateFormatter().string(from: Date())
+        urlComponents.queryItems = [
+            URLQueryItem(name: "ident_type", value: "designator"),
+            URLQueryItem(name: "max_pages", value: "1")
+        ]
+        
+        guard let url = urlComponents.url else {
+            throw AeroAPIError.invalidURL
+        }
+        
+        var request = URLRequest(url: url)
+        request.setValue(apiKey, forHTTPHeaderField: "x-apikey")
+        
+        print("🔍 Fetching flight: \(url)")
+        
+        do {
+            let (data, urlResponse) = try await URLSession.shared.data(for: request)
+            
+            guard let httpResponse = urlResponse as? HTTPURLResponse else {
+                throw AeroAPIError.invalidResponse
+            }
+            
+            print("📡 Response Status Code: \(httpResponse.statusCode)")
+            
+            // Log raw response for debugging
+            if let responseString = String(data: data, encoding: .utf8) {
+                print("📦 Raw Response: \(responseString)")
+            }
+            
+            // Handle error responses
+            guard (200...299).contains(httpResponse.statusCode) else {
+                switch httpResponse.statusCode {
+                case 429:
+                    throw AeroAPIError.rateLimitExceeded
+                case 400:
+                    throw AeroAPIError.noFlightsFound
+                default:
+                    throw AeroAPIError.serverError(httpResponse.statusCode)
+                }
+            }
+            
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601
+            
+            // Decode the response
+            let flightResponse = try decoder.decode(AeroFlightResponse.self, from: data)
+            
+            // Sort flights by priority (in-progress first, then by departure time)
+            let sortedFlights = flightResponse.flights.sorted { first, second in
+                if first.isInProgress && !second.isInProgress {
+                    return true
+                }
+                if !first.isInProgress && second.isInProgress {
+                    return false
+                }
+                
+                // If neither or both are in progress, sort by departure time
+                let firstDate = first.scheduledOut.flatMap { ISO8601DateFormatter().date(from: $0) } ?? .distantFuture
+                let secondDate = second.scheduledOut.flatMap { ISO8601DateFormatter().date(from: $0) } ?? .distantFuture
+                return firstDate < secondDate
+            }
+            
+            if sortedFlights.isEmpty {
+                throw AeroAPIError.noFlightsFound
+            }
+            
+            return sortedFlights
+            
+        } catch let decodingError as DecodingError {
+            print("Decoding error: \(decodingError)")
+            throw AeroAPIError.decodingError
+        } catch {
+            print("Network error: \(error)")
+            throw AeroAPIError.networkError(error)
+        }
     }
     
     // The search strategy methods remain the same
