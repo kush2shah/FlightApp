@@ -52,13 +52,24 @@ struct FlightStatusView: View {
     }
     
     private var statusDetails: (icon: String, color: Color, message: String) {
-        // Previous status logic remains the same
         if flight.cancelled {
             return ("xmark.circle.fill", .red, "Cancelled")
         }
         
         if flight.diverted {
             return ("exclamationmark.triangle.fill", .orange, "Diverted")
+        }
+        
+        // For arrived flights
+        if flight.actualOn != nil {
+            if let delay = flight.arrivalDelay {
+                if delay > 0 {
+                    return ("checkmark.circle.fill", .orange, "Arrived \(delay.formattedDelay()) late")
+                } else if delay < 0 {
+                    return ("checkmark.circle.fill", .green, "Arrived \(abs(delay).formattedDelay()) early")
+                }
+            }
+            return ("checkmark.circle.fill", .green, "Arrived on time")
         }
         
         let hasSignificantDepartureDelay = (flight.departureDelay ?? 0) > 900
@@ -69,13 +80,6 @@ struct FlightStatusView: View {
                 return ("timer", .orange, "Delayed")
             }
             return ("airplane", .green, "In Flight")
-        }
-        
-        if flight.actualOn != nil {
-            if hasSignificantArrivalDelay {
-                return ("timer", .orange, "Arrived (Delayed)")
-            }
-            return ("checkmark.circle.fill", .green, "Arrived")
         }
         
         if flight.status.lowercased().contains("scheduled") {

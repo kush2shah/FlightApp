@@ -10,9 +10,12 @@ import SwiftUI
 struct FlightSearchView: View {
     @State private var searchText = ""
     @State private var selectedFlightNumber: IdentifiableString?
+    @State private var availableFlights: [AeroFlight] = []
+    @State private var showFlightSelectionSheet = false
     @FocusState private var isSearchFocused: Bool
     
     @StateObject private var recentSearchStore = RecentSearchStore()
+    
     
     private var searchResults: [PopularRoute] {
         guard !searchText.isEmpty else { return PopularRouteStore.routes }
@@ -42,6 +45,18 @@ struct FlightSearchView: View {
                 .padding()
             }
             .navigationTitle("Track Flight")
+            .sheet(isPresented: $showFlightSelectionSheet) {
+                FlightSelectionSheet(
+                    flights: availableFlights,
+                    onSelect: { selectedFlight in
+                        selectedFlightNumber = IdentifiableString(value: selectedFlight.ident)
+                        addToRecentSearches()
+                        isSearchFocused = false
+                    }
+                )
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+            }
             .sheet(item: $selectedFlightNumber) { identifiableFlightNumber in
                 FlightView(flightNumber: identifiableFlightNumber.value)
                     .presentationDragIndicator(.visible)
@@ -130,13 +145,34 @@ struct FlightSearchView: View {
     }
     
     private func searchFlight() {
-        guard !searchText.isEmpty else { return }
-        
-        selectedFlightNumber = IdentifiableString(value: searchText)
-        addToRecentSearches()
-        isSearchFocused = false
-        searchText = "" // Clear search text after submission
-    }
+            guard !searchText.isEmpty else { return }
+            
+            // Use AeroAPIService to fetch flights
+            Task {
+                do {
+                    let flights = try await AeroAPIService.shared.getFlightInfo(searchText)
+                    
+                    await MainActor.run {
+                        availableFlights = flights
+                        
+                        if flights.count == 1 {
+                            // If only one flight, directly select it
+                            selectedFlightNumber = IdentifiableString(value: flights[0].ident)
+                            addToRecentSearches()
+                        } else if !flights.isEmpty {
+                            // If multiple flights, show selection sheet
+                            showFlightSelectionSheet = true
+                        }
+                    }
+                } catch {
+                    // Handle error (you might want to show an alert or error view)
+                    print("Error searching flight: \(error)")
+                }
+            }
+            
+            isSearchFocused = false
+            searchText = "" // Clear search text after submission
+        }
     
     private func selectRoute(_ route: PopularRoute) {
         selectedFlightNumber = IdentifiableString(value: route.flightNumber)

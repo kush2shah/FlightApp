@@ -105,33 +105,44 @@ class AeroAPIService {
             // Decode the response
             let flightResponse = try decoder.decode(AeroFlightResponse.self, from: data)
             
-            // Sort flights by priority (in-progress first, then by departure time)
+            // Sort flights by scheduled departure time
             let sortedFlights = flightResponse.flights.sorted { first, second in
-                if first.isInProgress && !second.isInProgress {
-                    return true
-                }
-                if !first.isInProgress && second.isInProgress {
-                    return false
-                }
-                
-                // If neither or both are in progress, sort by departure time
                 let firstDate = first.scheduledOut.flatMap { ISO8601DateFormatter().date(from: $0) } ?? .distantFuture
                 let secondDate = second.scheduledOut.flatMap { ISO8601DateFormatter().date(from: $0) } ?? .distantFuture
                 return firstDate < secondDate
             }
             
-            if sortedFlights.isEmpty {
+            // Find the current/next flight
+            let now = Date()
+            let currentFlightIndex = sortedFlights.firstIndex { flight in
+                guard let scheduledOut = flight.scheduledOut.flatMap({ ISO8601DateFormatter().date(from: $0) }) else {
+                    return false
+                }
+                
+                // If flight is in progress, it's current
+                if flight.isInProgress {
+                    return true
+                }
+                
+                // If flight hasn't departed and is within next 6 hours, it's current
+                if scheduledOut > now && scheduledOut.timeIntervalSince(now) < 6 * 3600 {
+                    return true
+                }
+                
+                return false
+            } ?? 0
+            
+            // Get a window of 3 flights centered on the current flight
+            let startIndex = max(0, currentFlightIndex - 1)
+            let endIndex = min(sortedFlights.count, startIndex + 3)
+            
+            let relevantFlights = Array(sortedFlights[startIndex..<endIndex])
+            
+            if relevantFlights.isEmpty {
                 throw AeroAPIError.noFlightsFound
             }
             
-            return sortedFlights
-            
-        } catch let decodingError as DecodingError {
-            print("Decoding error: \(decodingError)")
-            throw AeroAPIError.decodingError
-        } catch {
-            print("Network error: \(error)")
-            throw AeroAPIError.networkError(error)
+            return relevantFlights
         }
     }
     
