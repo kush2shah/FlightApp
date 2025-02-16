@@ -18,17 +18,16 @@ struct FlightHeader: View {
                     HStack {
                         if let operatorName = flight.operatorIata ?? flight.operator_ {
                             Text(operatorName)
-                                .font(.headline)
+                                .font(.sfRounded(size: 17, weight: .semibold))
                                 .foregroundColor(.secondary)
                         }
                         Text(flight.flightNumber ?? flight.ident)
-                            .font(.title2)
-                            .fontWeight(.bold)
+                            .font(.sfRounded(size: 24, weight: .bold))
                     }
                     
                     if let type = flight.aircraftType {
                         Text(type)
-                            .font(.subheadline)
+                            .font(.sfRounded(size: 15))
                             .foregroundColor(.secondary)
                     }
                 }
@@ -36,7 +35,7 @@ struct FlightHeader: View {
                 Spacer()
                 
                 Text(status.status)
-                    .font(.subheadline)
+                    .font(.sfRounded(size: 15, weight: .medium))
                     .padding(.horizontal, 12)
                     .padding(.vertical, 6)
                     .background(status.color.opacity(0.1))

@@ -50,43 +50,47 @@ struct FlightSearchView: View {
     }
     
     private var searchBarSection: some View {
-        HStack {
-            Image(systemName: "magnifyingglass")
-                .foregroundColor(.secondary)
-            
-            TextField("Enter flight number", text: $searchText)
-                .textInputAutocapitalization(.characters)
-                .autocorrectionDisabled()
-                .focused($isSearchFocused)
-                .onSubmit(searchFlight)
-        }
-        .padding()
-        .background(Color.secondary.opacity(0.1))
-        .cornerRadius(12)
-    }
-    
-    private var recentSearchesSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Recent Searches")
-                .font(.headline)
-            
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 10) {
-                    ForEach(recentSearchStore.recentSearches) { search in
-                        Button(action: {
-                            selectRecentSearch(search)
-                        }) {
-                            Text(search.route)
-                                .padding(8)
-                                .background(Color.blue.opacity(0.1))
-                                .cornerRadius(8)
-                                .foregroundColor(.blue)
-                        }
-                    }
-                }
-            }
-        }
-    }
+           HStack {
+               Image(systemName: "magnifyingglass")
+                   .foregroundColor(.secondary)
+               
+               TextField("Enter flight number", text: $searchText)
+                   .font(.sfRounded(size: 17))
+                   .textInputAutocapitalization(.characters)
+                   .autocorrectionDisabled()
+                   .focused($isSearchFocused)
+                   .onSubmit(searchFlight)
+           }
+           .padding()
+           .background(Color.secondary.opacity(0.1))
+           .cornerRadius(12)
+       }
+       
+       private var recentSearchesSection: some View {
+           VStack(alignment: .leading, spacing: 10) {
+               Text("Recent Searches")
+                   .font(.sfRounded(size: 17, weight: .semibold))
+               
+               ScrollView(.horizontal, showsIndicators: false) {
+                   HStack(spacing: 10) {
+                       ForEach(recentSearchStore.recentSearches) { search in
+                           Button(action: {
+                               selectRecentSearch(search)
+                           }) {
+                               Text(search.route)
+                                   .font(.sfRounded(size: 15))
+                                   .padding(8)
+                                   .background(Color.blue.opacity(0.1))
+                                   .cornerRadius(8)
+                                   .foregroundColor(.blue)
+                           }
+                       }
+                   }
+               }
+           }
+       }
+   
+
     
     private var popularRoutesSection: some View {
         VStack(alignment: .leading, spacing: 15) {

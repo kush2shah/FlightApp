@@ -108,18 +108,17 @@ struct FlightRouteCard: View {
     }
 }
 
-private struct RouteEndpoint: View {
+struct RouteEndpoint: View {
     let code: String
     let name: String
     
     var body: some View {
         VStack(alignment: .center, spacing: 4) {
             Text(code)
-                .font(.headline)
-                .fontWeight(.bold)
+                .font(.sfRounded(size: 17, weight: .bold))
             
             Text(name)
-                .font(.caption)
+                .font(.sfRounded(size: 13))
                 .foregroundColor(.secondary)
                 .lineLimit(1)
         }

@@ -21,11 +21,13 @@ struct FlightView: View {
                         
                         FlightStatusView(flight: flight)
                         
+                        // Get times once and reuse
+                        let flightTimes = viewModel.getFlightTimes()
                         FlightRouteCard(
                             flight: flight,
                             times: (
-                                departure: viewModel.getFlightTimes().departure,
-                                arrival: viewModel.getFlightTimes().arrival
+                                departure: flightTimes.departure,
+                                arrival: flightTimes.arrival
                             )
                         )
                         

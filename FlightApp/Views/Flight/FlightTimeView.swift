@@ -35,42 +35,41 @@ struct FlightTimeView: View {
     
     // Main time display with actual or estimated time
     private var mainTimeDisplay: some View {
-        Group {
-            if let actualTime = time.actualTime {
-                Text(actualTime)
-                    .font(.headline)
-                    .foregroundColor(primaryTimeColor)
-            }
-            else {
-                Text(time.estimatedTime ?? time.scheduledTime ?? "--:--")
-                    .font(.headline)
-                    .foregroundColor(primaryTimeColor)
+            Group {
+                if let actualTime = time.actualTime {
+                    Text(actualTime)
+                        .font(.sfRounded(size: 17, weight: .bold))
+                        .foregroundColor(primaryTimeColor)
+                }
+                else {
+                    Text(time.estimatedTime ?? time.scheduledTime ?? "--:--")
+                        .font(.sfRounded(size: 17, weight: .bold))
+                        .foregroundColor(primaryTimeColor)
+                }
             }
         }
-    }
+        
+        private var comparisonTimeDisplay: some View {
+            Group {
+                if let actualTime = time.actualTime,
+                   let scheduledTime = time.scheduledTime,
+                   actualTime != scheduledTime {
+                    Text(scheduledTime)
+                        .font(.sfRounded(size: 13))
+                        .foregroundColor(.secondary)
+                        .strikethrough()
+                }
+                else if let estimatedTime = time.estimatedTime,
+                        let scheduledTime = time.scheduledTime,
+                        estimatedTime != scheduledTime {
+                    Text(scheduledTime)
+                        .font(.sfRounded(size: 13))
+                        .foregroundColor(.secondary)
+                        .strikethrough()
+                }
+            }
+        }
     
-    // Comparison display showing scheduled time if different
-    private var comparisonTimeDisplay: some View {
-        Group {
-            // Show scheduled time if it differs from actual/estimated
-            if let actualTime = time.actualTime,
-               let scheduledTime = time.scheduledTime,
-               actualTime != scheduledTime {
-                Text(scheduledTime)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .strikethrough()
-            }
-            else if let estimatedTime = time.estimatedTime,
-                    let scheduledTime = time.scheduledTime,
-                    estimatedTime != scheduledTime {
-                Text(scheduledTime)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .strikethrough()
-            }
-        }
-    }
     
     // Status badge showing early/delayed information
     private var statusBadge: some View {

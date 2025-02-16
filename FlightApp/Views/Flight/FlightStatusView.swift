@@ -7,11 +7,52 @@
 
 import SwiftUI
 
+extension Font {
+    static func sfRounded(size: CGFloat, weight: Font.Weight = .regular) -> Font {
+        return .system(size: size, weight: weight, design: .rounded)
+    }
+}
+
 struct FlightStatusView: View {
     let flight: AeroFlight
     
+    private var timeUntilFlight: (String, Color)? {
+        guard let scheduledDeparture = flight.scheduledOut.flatMap({ ISO8601DateFormatter().date(from: $0) }) else {
+            return nil
+        }
+        
+        let now = Date()
+        let timeInterval = scheduledDeparture.timeIntervalSince(now)
+        
+        // Don't show for past flights
+        guard timeInterval > 0 else {
+            return nil
+        }
+        
+        let hours = Int(timeInterval / 3600)
+        let minutes = Int((timeInterval.truncatingRemainder(dividingBy: 3600)) / 60)
+        
+        // Format the time remaining
+        let timeString: String
+        let color: Color
+        
+        switch hours {
+        case 0:
+            timeString = "\(minutes)m until departure"
+            color = minutes < 30 ? .orange : .blue
+        case 1:
+            timeString = "1h \(minutes)m until departure"
+            color = .blue
+        default:
+            timeString = "\(hours)h until departure"
+            color = .blue
+        }
+        
+        return (timeString, color)
+    }
+    
     private var statusDetails: (icon: String, color: Color, message: String) {
-        // Determine status based on multiple factors
+        // Previous status logic remains the same
         if flight.cancelled {
             return ("xmark.circle.fill", .red, "Cancelled")
         }
@@ -20,11 +61,9 @@ struct FlightStatusView: View {
             return ("exclamationmark.triangle.fill", .orange, "Diverted")
         }
         
-        // Check for delays
-        let hasSignificantDepartureDelay = (flight.departureDelay ?? 0) > 900 // 15 minutes
-        let hasSignificantArrivalDelay = (flight.arrivalDelay ?? 0) > 900 // 15 minutes
+        let hasSignificantDepartureDelay = (flight.departureDelay ?? 0) > 900
+        let hasSignificantArrivalDelay = (flight.arrivalDelay ?? 0) > 900
         
-        // In-progress flight states
         if flight.actualOff != nil && flight.actualOn == nil {
             if hasSignificantDepartureDelay || hasSignificantArrivalDelay {
                 return ("timer", .orange, "Delayed")
@@ -32,7 +71,6 @@ struct FlightStatusView: View {
             return ("airplane", .green, "In Flight")
         }
         
-        // Completed flight states
         if flight.actualOn != nil {
             if hasSignificantArrivalDelay {
                 return ("timer", .orange, "Arrived (Delayed)")
@@ -40,12 +78,10 @@ struct FlightStatusView: View {
             return ("checkmark.circle.fill", .green, "Arrived")
         }
         
-        // Scheduled flight states
         if flight.status.lowercased().contains("scheduled") {
             return ("clock", .blue, "Scheduled")
         }
         
-        // Fallback
         return ("info.circle", .secondary, flight.status.capitalized)
     }
     
@@ -60,25 +96,29 @@ struct FlightStatusView: View {
                 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(statusDetails.message)
-                        .font(.headline)
+                        .font(.sfRounded(size: 18, weight: .semibold))
                         .foregroundColor(statusDetails.color)
                     
-                    // Detailed delay information
+                    if let (timeString, timeColor) = timeUntilFlight {
+                        Text(timeString)
+                            .font(.sfRounded(size: 15, weight: .medium))
+                            .foregroundColor(timeColor)
+                    }
+                    
                     if let departureDelay = flight.departureDelay, departureDelay > 0 {
                         Text("Departure Delayed by \(formatDelay(departureDelay))")
-                            .font(.subheadline)
+                            .font(.sfRounded(size: 15))
                             .foregroundColor(.orange)
                     }
                     
                     if let arrivalDelay = flight.arrivalDelay, arrivalDelay > 0 {
                         Text("Arrival Delayed by \(formatDelay(arrivalDelay))")
-                            .font(.subheadline)
+                            .font(.sfRounded(size: 15))
                             .foregroundColor(.orange)
                     }
                 }
             }
             
-            // Additional Status Details
             additionalStatusDetails
         }
         .padding()
@@ -122,11 +162,13 @@ struct DetailRow: View {
                 .frame(width: 20)
             
             Text(title)
+                .font(.sfRounded(size: 15))
                 .foregroundColor(.secondary)
             
             Spacer()
             
             Text(value)
+                .font(.sfRounded(size: 15, weight: .medium))
                 .foregroundColor(.primary)
         }
     }
