@@ -11,6 +11,13 @@ struct FlightView: View {
     @Environment(\.dismiss) private var dismiss
     @StateObject private var viewModel = FlightViewModel()
     let flightNumber: String
+    let skipFlightSelection: Bool
+    
+    // Add an initializer with default parameter
+    init(flightNumber: String, skipFlightSelection: Bool = false) {
+        self.flightNumber = flightNumber
+        self.skipFlightSelection = skipFlightSelection
+    }
     
     var body: some View {
         NavigationStack {
@@ -18,6 +25,10 @@ struct FlightView: View {
                 VStack(spacing: 20) {
                     if let flight = viewModel.currentFlight {
                         FlightHeaderView(flight: flight)
+                        
+                        // Add airline profile section here
+                        airlineProfileSection
+                        
                         FlightStatusView(flight: flight)
                         
                         // Get times once and reuse
@@ -59,7 +70,64 @@ struct FlightView: View {
             }
         }
         .onAppear {
+            viewModel.skipFlightSelection = skipFlightSelection
             viewModel.searchFlight(flightNumber: flightNumber)
+            
+            // Check for current flight and fetch airline info if needed
+            if viewModel.currentFlight != nil && viewModel.airlineProfile == nil {
+                viewModel.fetchAirlineInfo()
+            }
+        }
+        // Use a different approach to respond to flight changes
+        .onChange(of: viewModel.currentFlight?.faFlightId) { _ in
+            if viewModel.currentFlight != nil {
+                viewModel.fetchAirlineInfo()
+            }
+        }
+    }
+    
+    // Airline profile section with loading states
+    private var airlineProfileSection: some View {
+        Group {
+            if viewModel.isLoadingAirline {
+                HStack {
+                    Spacer()
+                    ProgressView()
+                        .padding()
+                    Spacer()
+                }
+            } else if let airline = viewModel.airlineProfile {
+                AirlineProfileView(airline: airline)
+            } else if viewModel.airlineError != nil {
+                // Show minimal fallback with just the airline code if we couldn't load details
+                minimalAirlineInfo
+            } else {
+                // Show minimal airline info while waiting to load
+                minimalAirlineInfo
+            }
+        }
+    }
+    
+    // Minimal airline info shown as fallback
+    private var minimalAirlineInfo: some View {
+        Group {
+            if let flight = viewModel.currentFlight,
+               let airlineCode = flight.operatorIcao ?? flight.operatorIata ?? flight.operator_ {
+                HStack {
+                    VStack(alignment: .leading) {
+                        Text("Operator")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Text(airlineCode)
+                            .font(.headline)
+                    }
+                    
+                    Spacer()
+                }
+                .padding()
+                .background(Color(.systemGray6))
+                .cornerRadius(12)
+            }
         }
     }
 }
@@ -143,211 +211,6 @@ struct FlightSelectionSheet: View {
             .navigationBarTitleDisplayMode(.inline)
         }
     }
-}
-    
-    private func formatTimeWithZone(
-        actual: String?,
-        estimated: String?,
-        scheduled: String?,
-        timezone: String,
-        departureDelay: Int? = nil,
-        arrivalDelay: Int? = nil,
-        isCancelled: Bool = false
-    ) -> FlightTime {
-        let apiFormatter = ISO8601DateFormatter.standardFormatter()
-        let timeZone = TimeZone(identifier: timezone) ?? TimeZone.current
-        
-        let actualDate = actual.flatMap { apiFormatter.date(from: $0) }
-        let estimatedDate = estimated.flatMap { apiFormatter.date(from: $0) }
-        let scheduledDate = scheduled.flatMap { apiFormatter.date(from: $0) }
-        
-        var isEarly = false
-        var isDelayed = false
-        var minutesDifference: Int? = nil
-        
-        if let delay = departureDelay ?? arrivalDelay {
-            if delay > 0 {
-                isDelayed = true
-                minutesDifference = delay / 60
-            } else if delay < 0 {
-                isEarly = true
-                minutesDifference = abs(delay / 60)
-            }
-        }
-        
-        if let actualDate = actualDate {
-            return FlightTime(
-                displayTime: actualDate.formattedTime(in: timeZone),
-                displayTimezone: actualDate.formattedTimezone(timezone: timeZone),
-                actualTime: actualDate.formattedTime(in: timeZone),
-                scheduledTime: scheduledDate?.formattedTime(in: timeZone),
-                estimatedTime: estimatedDate?.formattedTime(in: timeZone),
-                date: actualDate.formattedDate(in: timeZone),
-                isEarly: isEarly,
-                isDelayed: isDelayed,
-                minutesDifference: minutesDifference,
-                cancelled: isCancelled
-            )
-        }
-        
-        if let estimatedDate = estimatedDate {
-            return FlightTime(
-                displayTime: estimatedDate.formattedTime(in: timeZone),
-                displayTimezone: estimatedDate.formattedTimezone(timezone: timeZone),
-                actualTime: nil,
-                scheduledTime: scheduledDate?.formattedTime(in: timeZone),
-                estimatedTime: estimatedDate.formattedTime(in: timeZone),
-                date: estimatedDate.formattedDate(in: timeZone),
-                isEarly: isEarly,
-                isDelayed: isDelayed,
-                minutesDifference: minutesDifference,
-                cancelled: isCancelled
-            )
-        }
-        
-        if let scheduledDate = scheduledDate {
-            return FlightTime(
-                displayTime: scheduledDate.formattedTime(in: timeZone),
-                displayTimezone: scheduledDate.formattedTimezone(timezone: timeZone),
-                actualTime: nil,
-                scheduledTime: scheduledDate.formattedTime(in: timeZone),
-                estimatedTime: nil,
-                date: scheduledDate.formattedDate(in: timeZone),
-                isEarly: false,
-                isDelayed: false,
-                minutesDifference: nil,
-                cancelled: isCancelled
-            )
-        }
-        
-        return FlightTime(
-            displayTime: "--:--",
-            displayTimezone: timeZone.abbreviation() ?? "UTC",
-            actualTime: nil,
-            scheduledTime: nil,
-            estimatedTime: nil,
-            date: "---",
-            isEarly: false,
-            isDelayed: false,
-            minutesDifference: nil,
-            cancelled: isCancelled
-        )
-    }
-
-
-// Status badge component
-struct FlightStatusBadge: View {
-    var body: some View {
-        Text("In Progress")
-            .font(.caption)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(Color.green.opacity(0.2))
-            .foregroundColor(.green)
-            .cornerRadius(4)
-    }
-}
-
-// Route information component
-struct RouteInformationView: View {
-    let flight: AeroFlight
-    
-    var body: some View {
-        HStack {
-            AirportView(
-                code: flight.origin.displayCode,
-                city: flight.origin.city ?? "",
-                alignment: .leading
-            )
-            
-            Spacer()
-            
-            Image(systemName: "airplane")
-                .foregroundColor(.secondary)
-            
-            Spacer()
-            
-            AirportView(
-                code: flight.destination.displayCode,
-                city: flight.destination.city ?? "",
-                alignment: .trailing
-            )
-        }
-    }
-}
-
-// Airport information component
-struct AirportView: View {
-    let code: String
-    let city: String
-    let alignment: HorizontalAlignment
-    
-    var body: some View {
-        VStack(alignment: alignment) {
-            Text(code)
-            Text(city)
-                .font(.caption)
-                .foregroundColor(.secondary)
-        }
-    }
-}
-
-// Codeshare information component
-struct CodeshareInformationView: View {
-    let codeshares: [String]?
-    
-    var body: some View {
-        if let codeshares = codeshares, !codeshares.isEmpty {
-            Text("Also known as: \(codeshares.joined(separator: ", "))")
-                .font(.caption)
-                .foregroundColor(.secondary)
-        }
-    }
-}
-
-struct FlightHeaderView: View {
-    let flight: AeroFlight
-    
-    var body: some View {
-        VStack(spacing: 12) {
-            HStack {
-                VStack(alignment: .leading) {
-                    HStack {
-                        if let operatorName = flight.operatorIata ?? flight.operator_ {
-                            Text(operatorName)
-                                .font(.headline)
-                                .foregroundColor(.secondary)
-                        }
-                        Text(flight.flightNumber ?? flight.ident)
-                            .font(.title2)
-                            .fontWeight(.bold)
-                    }
-                    
-                    if let type = flight.aircraftType {
-                        Text(type)
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                    }
-                }
-                
-                Spacer()
-            }
-        }
-    }
-}
-
-struct LoadingView: View {
-    let flightNumber: String
-    
-    var body: some View {
-        VStack(spacing: 16) {
-            ProgressView()
-                .scaleEffect(1.5)
-            Text("Searching for flight \(flightNumber)...")
-                .foregroundColor(.secondary)
-        }
-    }
-    
 }
 
 #Preview {

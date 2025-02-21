@@ -14,6 +14,10 @@ class FlightViewModel: ObservableObject {
     @Published var isLoading = false
     @Published var error: Error?
     @Published var showFlightSelection = false
+    @Published var airlineProfile: AirlineProfile?
+    @Published var isLoadingAirline = false
+    @Published var airlineError: Error?
+    var skipFlightSelection = false
     
     func selectFlight(_ flight: AeroFlight) {
         print("📱 Selecting flight: \(flight.ident)")
@@ -43,9 +47,14 @@ class FlightViewModel: ObservableObject {
                     if flights.count == 1 {
                         print("📱 Auto-selecting single flight")
                         self.currentFlight = flights[0]
-                    } else if !flights.isEmpty {
+                    } else if !flights.isEmpty && !skipFlightSelection {
                         print("📱 Showing flight selection sheet for \(flights.count) flights")
                         self.showFlightSelection = true
+                    } else if !flights.isEmpty && skipFlightSelection {
+                        // If we're skipping selection (because we came from search view's selection)
+                        // Just select the first flight
+                        print("📱 Skipping selection and using first flight")
+                        self.currentFlight = flights[0]
                     }
                 }
             } catch {
@@ -192,6 +201,34 @@ class FlightViewModel: ObservableObject {
             }
             return "\(minutes)m"
         }
+    
+    func fetchAirlineInfo() {
+            guard let flight = currentFlight,
+                  let airlineCode = AirlineService.shared.getAirlineCodeFromFlight(flight) else {
+                return
+            }
+            
+            isLoadingAirline = true
+            airlineError = nil
+            
+            Task {
+                do {
+                    print("🔎 Fetching airline info for: \(airlineCode)")
+                    let profile = try await AirlineService.shared.getAirlineInfo(code: airlineCode)
+                    
+                    await MainActor.run {
+                        self.airlineProfile = profile
+                        self.isLoadingAirline = false
+                    }
+                } catch {
+                    print("❌ Error fetching airline: \(error)")
+                    await MainActor.run {
+                        self.airlineError = error
+                        self.isLoadingAirline = false
+                    }
+                }
+            }
+        }
 }
 
 extension Int {
@@ -209,3 +246,4 @@ extension Int {
         return "\(minutes)m"
     }
 }
+
