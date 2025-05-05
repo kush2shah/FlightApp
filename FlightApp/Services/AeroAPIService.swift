@@ -58,11 +58,20 @@ class AeroAPIService {
         }
         
         // Add parameters for latest flights
-        let now = ISO8601DateFormatter().string(from: Date())
+        let now = Date()
+        let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: now)!
+        let dateFormatter = ISO8601DateFormatter()
+        let yesterdayString = dateFormatter.string(from: yesterday)
+        let nowString = dateFormatter.string(from: now)
+
+        // Update query parameters to look for recent flights
         urlComponents.queryItems = [
             URLQueryItem(name: "ident_type", value: "designator"),
-            URLQueryItem(name: "max_pages", value: "1")
+            URLQueryItem(name: "max_pages", value: "1"),
+            URLQueryItem(name: "start", value: yesterdayString),
+            URLQueryItem(name: "end", value: nowString)
         ]
+
         
         guard let url = urlComponents.url else {
             throw AeroAPIError.invalidURL
