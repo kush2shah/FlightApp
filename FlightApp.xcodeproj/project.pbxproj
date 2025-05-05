@@ -30,7 +30,7 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		43AA1E4F2D4CA278002D5274 /* Exceptions for "FlightApp" folder in "FlightApp" target */ = {
+		430B554D2DC8382F00391F3B /* Exceptions for "FlightApp" folder in "FlightApp" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
@@ -43,7 +43,7 @@
 		43AA1E2B2D4CA276002D5274 /* FlightApp */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				43AA1E4F2D4CA278002D5274 /* Exceptions for "FlightApp" folder in "FlightApp" target */,
+				430B554D2DC8382F00391F3B /* Exceptions for "FlightApp" folder in "FlightApp" target */,
 			);
 			path = FlightApp;
 			sourceTree = "<group>";
@@ -312,7 +312,7 @@
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.kushs.FlightApp;
+				PRODUCT_BUNDLE_IDENTIFIER = com.kushs.FlightApp1;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = auto;
@@ -354,7 +354,7 @@
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.kushs.FlightApp;
+				PRODUCT_BUNDLE_IDENTIFIER = com.kushs.FlightApp1;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = auto;
@@ -431,6 +431,8 @@
 		};
 		43AA1E542D4CA278002D5274 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReferenceAnchor = 43AA1E2B2D4CA276002D5274 /* FlightApp */;
+			baseConfigurationReferenceRelativePath = Config.xcconfig;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
@@ -574,6 +576,8 @@
 		};
 		43AA1EA82D59CB29002D5274 /* Development */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReferenceAnchor = 43AA1E2B2D4CA276002D5274 /* FlightApp */;
+			baseConfigurationReferenceRelativePath = Config.xcconfig;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
@@ -663,7 +667,7 @@
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.kushs.FlightApp;
+				PRODUCT_BUNDLE_IDENTIFIER = com.kushs.FlightApp1;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = auto;

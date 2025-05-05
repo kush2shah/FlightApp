@@ -18,7 +18,7 @@ struct FlightSearchView: View {
     @FocusState private var isSearchFocused: Bool
     
     @StateObject private var recentSearchStore = RecentSearchStore()
-    
+    @AppStorage("useEnhancedMode") private var useEnhancedMode = false
     
     private var searchResults: [PopularRoute] {
         guard !searchText.isEmpty else { return PopularRouteStore.routes }
@@ -48,6 +48,9 @@ struct FlightSearchView: View {
                         
                         // Popular Routes
                         popularRoutesSection
+                        
+                        // Enhanced Mode Toggle
+                        enhancedModeToggleSection
                     }
                 }
                 .padding()
@@ -66,8 +69,13 @@ struct FlightSearchView: View {
                 .presentationDragIndicator(.visible)
             }
             .sheet(item: $selectedFlightNumber) { identifiableFlightNumber in
-                FlightView(flightNumber: identifiableFlightNumber.value, skipFlightSelection: true)
-                    .presentationDragIndicator(.visible)
+                if useEnhancedMode {
+                    EnhancedFlightView(flightNumber: identifiableFlightNumber.value, skipFlightSelection: true)
+                        .presentationDragIndicator(.visible)
+                } else {
+                    FlightView(flightNumber: identifiableFlightNumber.value, skipFlightSelection: true)
+                        .presentationDragIndicator(.visible)
+                }
             }
             .alert("Search Error", isPresented: $showErrorAlert, actions: {
                 Button("OK", role: .cancel) { }
@@ -159,6 +167,30 @@ struct FlightSearchView: View {
                 }
             }
         }
+    }
+    
+    private var enhancedModeToggleSection: some View {
+        VStack {
+            Divider()
+                .padding(.vertical)
+            
+            HStack {
+                VStack(alignment: .leading) {
+                    Text("Enhanced Mode")
+                        .font(.headline)
+                    
+                    Text("Beautiful visualizations and animations")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                
+                Spacer()
+                
+                Toggle("", isOn: $useEnhancedMode)
+                    .labelsHidden()
+            }
+        }
+        .padding(.top)
     }
     
     private func searchFlight() {
