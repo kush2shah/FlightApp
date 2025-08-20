@@ -140,20 +140,16 @@ struct FlightView: View {
             if let scheduledOut = flight.scheduledOut,
                let date = ISO8601DateFormatter().date(from: scheduledOut),
                let timezone = TimeZone(identifier: flight.origin.timezone ?? "UTC") {
-                VStack(spacing: 8) {
+                HStack {
                     Text(date.smartRelativeDate(in: timezone))
-                        .font(.title2)
-                        .fontWeight(.bold)
-                        .foregroundColor(.primary)
-                    
-                    Text(date.flightDateWithContext(in: timezone))
                         .font(.subheadline)
+                        .fontWeight(.medium)
                         .foregroundColor(.secondary)
+                    
+                    Spacer()
                 }
-                .frame(maxWidth: .infinity)
-                .padding()
-                .background(Color(.systemGray6).opacity(0.5))
-                .cornerRadius(12)
+                .padding(.horizontal)
+                .padding(.vertical, 8)
             }
         }
     }

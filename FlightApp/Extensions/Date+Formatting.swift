@@ -109,12 +109,16 @@ extension Date {
         
         let standardDate = formatter.string(from: self)
         
+        // Only show relative date for Today/Tomorrow/Yesterday
+        // For other dates, show the formatted date without duplication
         if relativeDate == "Today" || relativeDate == "Tomorrow" || relativeDate == "Yesterday" {
-            return "\(relativeDate) • \(standardDate)"
+            return relativeDate
         } else if relativeDate.contains(",") {
+            // Already contains full context (e.g., "Wed, Jan 15")
             return relativeDate
         } else {
-            return "\(relativeDate) • \(standardDate)"
+            // Day of week, add the date
+            return "\(relativeDate), \(standardDate)"
         }
     }
 }
