@@ -39,7 +39,7 @@ struct FlightHeroSection: View {
     
     var body: some View {
         VStack(spacing: 16) {
-            // Flight identifier
+            // Flight identifier with date
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(flight.operatorIata ?? flight.operator_ ?? "")
@@ -49,6 +49,15 @@ struct FlightHeroSection: View {
                     Text(flight.flightNumber ?? flight.ident)
                         .font(.largeTitle)
                         .fontWeight(.bold)
+                    
+                    // Subtle date display
+                    if let scheduledOut = flight.scheduledOut,
+                       let date = ISO8601DateFormatter().date(from: scheduledOut),
+                       let timezone = TimeZone(identifier: flight.origin.timezone ?? "UTC") {
+                        Text(date.smartRelativeDate(in: timezone))
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
                 }
                 
                 Spacer()
