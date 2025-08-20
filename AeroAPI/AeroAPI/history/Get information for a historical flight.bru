@@ -1,0 +1,27 @@
+meta {
+  name: Get information for a historical flight
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/history/flights/:ident
+  body: none
+  auth: none
+}
+
+params:query {
+  ~ident_type: 
+  ~start: 
+  ~end: 
+  ~max_pages: 
+  ~cursor: 
+}
+
+params:path {
+  ident: 
+}
+
+headers {
+  x-apikey: {{apiKey}}
+}

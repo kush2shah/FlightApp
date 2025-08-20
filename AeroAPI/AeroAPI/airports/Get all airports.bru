@@ -1,0 +1,15 @@
+meta {
+  name: Get all airports
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/airports
+  body: none
+  auth: none
+}
+
+headers {
+  x-apikey: {{apiKey}}
+}

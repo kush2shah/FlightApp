@@ -1,0 +1,28 @@
+meta {
+  name: Get flights that have recently departed from an airport
+  type: http
+  seq: 10
+}
+
+get {
+  url: {{baseUrl}}/airports/:id/flights/departures
+  body: none
+  auth: none
+}
+
+params:query {
+  ~airline: 
+  ~type: 
+  ~start: 
+  ~end: 
+  ~max_pages: 
+  ~cursor: 
+}
+
+params:path {
+  id: 
+}
+
+headers {
+  x-apikey: {{apiKey}}
+}

@@ -1,0 +1,19 @@
+meta {
+  name: Get flight-s current position- including Foresight data
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/foresight/flights/:id/position
+  body: none
+  auth: none
+}
+
+params:path {
+  id: 
+}
+
+headers {
+  x-apikey: {{apiKey}}
+}

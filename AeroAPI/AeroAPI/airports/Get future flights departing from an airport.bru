@@ -1,0 +1,28 @@
+meta {
+  name: Get future flights departing from an airport
+  type: http
+  seq: 11
+}
+
+get {
+  url: {{baseUrl}}/airports/:id/flights/scheduled_departures
+  body: none
+  auth: none
+}
+
+params:query {
+  ~airline: 
+  ~type: 
+  ~start: 
+  ~end: 
+  ~max_pages: 
+  ~cursor: 
+}
+
+params:path {
+  id: 
+}
+
+headers {
+  x-apikey: {{apiKey}}
+}

@@ -1,0 +1,22 @@
+meta {
+  name: Search for flight positions
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/flights/search/positions
+  body: none
+  auth: none
+}
+
+params:query {
+  ~query: 
+  ~unique_flights: 
+  ~max_pages: 
+  ~cursor: 
+}
+
+headers {
+  x-apikey: {{apiKey}}
+}

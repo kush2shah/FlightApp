@@ -1,0 +1,27 @@
+meta {
+  name: Get weather conditions for given airport
+  type: http
+  seq: 15
+}
+
+get {
+  url: {{baseUrl}}/airports/:id/weather/observations
+  body: none
+  auth: none
+}
+
+params:query {
+  ~temperature_units: 
+  ~return_nearby_weather: 
+  ~timestamp: 
+  ~max_pages: 
+  ~cursor: 
+}
+
+params:path {
+  id: 
+}
+
+headers {
+  x-apikey: {{apiKey}}
+}

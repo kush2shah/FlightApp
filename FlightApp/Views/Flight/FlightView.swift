@@ -24,23 +24,31 @@ struct FlightView: View {
             ScrollView {
                 VStack(spacing: 20) {
                     if let flight = viewModel.currentFlight {
-                        // Enhanced date header
-                        flightDateHeader(for: flight)
+                        // Hero section with flight number and route
+                        FlightHeroSection(flight: flight)
                         
-                        FlightHeaderView(flight: flight)
-                        
-                        // Add airline profile section here
-                        airlineProfileSection
-                        
-                        FlightStatusView(flight: flight)
-                        
-                        // Get times once and reuse
+                        // Time and progress information
                         let flightTimes = viewModel.getFlightTimes()
                         FlightRouteCard(
                             flight: flight,
                             times: flightTimes
                         )
                         
+                        // Gate and terminal information
+                        FlightGateTerminalCard(flight: flight)
+                        
+                        // Aircraft and route details
+                        FlightAircraftCard(flight: flight)
+                        
+                        // Airline profile section
+                        airlineProfileSection
+                        
+                        // Status view (if not cancelled)
+                        if !flight.cancelled {
+                            FlightStatusView(flight: flight)
+                        }
+                        
+                        // Additional flight details
                         if !flight.cancelled {
                             FlightDetailsSection(flight: flight)
                         }
@@ -134,25 +142,6 @@ struct FlightView: View {
         }
     }
     
-    // Enhanced date header for flight details
-    private func flightDateHeader(for flight: AeroFlight) -> some View {
-        Group {
-            if let scheduledOut = flight.scheduledOut,
-               let date = ISO8601DateFormatter().date(from: scheduledOut),
-               let timezone = TimeZone(identifier: flight.origin.timezone ?? "UTC") {
-                HStack {
-                    Text(date.smartRelativeDate(in: timezone))
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                        .foregroundColor(.secondary)
-                    
-                    Spacer()
-                }
-                .padding(.horizontal)
-                .padding(.vertical, 8)
-            }
-        }
-    }
 }
 
 struct FlightSelectionSheet: View {

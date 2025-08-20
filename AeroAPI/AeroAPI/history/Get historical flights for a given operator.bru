@@ -1,0 +1,26 @@
+meta {
+  name: Get historical flights for a given operator
+  type: http
+  seq: 9
+}
+
+get {
+  url: {{baseUrl}}/history/operators/:id/flights
+  body: none
+  auth: none
+}
+
+params:query {
+  start: 
+  end: 
+  ~max_pages: 
+  ~cursor: 
+}
+
+params:path {
+  id: 
+}
+
+headers {
+  x-apikey: {{apiKey}}
+}

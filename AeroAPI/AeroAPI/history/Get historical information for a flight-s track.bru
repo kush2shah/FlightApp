@@ -1,0 +1,24 @@
+meta {
+  name: Get historical information for a flight-s track
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/history/flights/:id/track
+  body: none
+  auth: none
+}
+
+params:query {
+  ~include_estimated_positions: 
+  ~include_surface_positions: 
+}
+
+params:path {
+  id: 
+}
+
+headers {
+  x-apikey: {{apiKey}}
+}

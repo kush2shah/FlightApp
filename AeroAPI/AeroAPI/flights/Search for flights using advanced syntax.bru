@@ -1,0 +1,21 @@
+meta {
+  name: Search for flights using advanced syntax
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/flights/search/advanced
+  body: none
+  auth: none
+}
+
+params:query {
+  ~query: 
+  ~max_pages: 
+  ~cursor: 
+}
+
+headers {
+  x-apikey: {{apiKey}}
+}

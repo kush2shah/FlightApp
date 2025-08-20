@@ -1,0 +1,19 @@
+meta {
+  name: Submit a Flight Intent
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{baseUrl}}/flights/:ident/intents
+  body: none
+  auth: none
+}
+
+params:path {
+  ident: 
+}
+
+headers {
+  x-apikey: {{apiKey}}
+}

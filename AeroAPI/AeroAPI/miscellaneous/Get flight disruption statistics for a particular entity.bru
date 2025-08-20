@@ -1,0 +1,15 @@
+meta {
+  name: Get flight disruption statistics for a particular entity
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/disruption_counts/:entity_type/:id
+  body: none
+  auth: none
+}
+
+headers {
+  x-apikey: {{apiKey}}
+}

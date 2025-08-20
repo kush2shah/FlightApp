@@ -1,0 +1,29 @@
+meta {
+  name: Get flights with a specific origin and destination
+  type: http
+  seq: 13
+}
+
+get {
+  url: {{baseUrl}}/airports/:id/flights/to/:dest_id
+  body: none
+  auth: none
+}
+
+params:query {
+  ~type: 
+  ~connection: 
+  ~start: 
+  ~end: 
+  ~max_pages: 
+  ~cursor: 
+}
+
+params:path {
+  id: 
+  dest_id: 
+}
+
+headers {
+  x-apikey: {{apiKey}}
+}

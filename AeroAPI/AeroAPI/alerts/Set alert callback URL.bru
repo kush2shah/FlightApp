@@ -1,0 +1,15 @@
+meta {
+  name: Set alert callback URL
+  type: http
+  seq: 7
+}
+
+put {
+  url: {{baseUrl}}/alerts/endpoint
+  body: none
+  auth: none
+}
+
+headers {
+  x-apikey: {{apiKey}}
+}

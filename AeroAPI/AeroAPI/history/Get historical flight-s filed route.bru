@@ -1,0 +1,19 @@
+meta {
+  name: Get historical flight-s filed route
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/history/flights/:id/route
+  body: none
+  auth: none
+}
+
+params:path {
+  id: 
+}
+
+headers {
+  x-apikey: {{apiKey}}
+}

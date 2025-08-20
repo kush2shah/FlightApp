@@ -1,0 +1,24 @@
+meta {
+  name: Get the canonical ident of a flight
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/flights/:ident/canonical
+  body: none
+  auth: none
+}
+
+params:query {
+  ~ident_type: 
+  ~country_code: 
+}
+
+params:path {
+  ident: 
+}
+
+headers {
+  x-apikey: {{apiKey}}
+}

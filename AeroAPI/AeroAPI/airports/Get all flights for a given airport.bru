@@ -1,0 +1,28 @@
+meta {
+  name: Get all flights for a given airport
+  type: http
+  seq: 8
+}
+
+get {
+  url: {{baseUrl}}/airports/:id/flights
+  body: none
+  auth: none
+}
+
+params:query {
+  ~airline: 
+  ~type: 
+  ~start: 
+  ~end: 
+  ~max_pages: 
+  ~cursor: 
+}
+
+params:path {
+  id: 
+}
+
+headers {
+  x-apikey: {{apiKey}}
+}

@@ -1,0 +1,15 @@
+meta {
+  name: Get all of an operator-s flights
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/operators/:id/flights
+  body: none
+  auth: none
+}
+
+headers {
+  x-apikey: {{apiKey}}
+}

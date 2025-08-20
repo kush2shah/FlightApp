@@ -1,0 +1,15 @@
+meta {
+  name: Get scheduled flights
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/operators/:id/flights/scheduled
+  body: none
+  auth: none
+}
+
+headers {
+  x-apikey: {{apiKey}}
+}

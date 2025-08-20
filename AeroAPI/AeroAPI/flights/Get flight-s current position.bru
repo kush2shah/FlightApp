@@ -1,0 +1,19 @@
+meta {
+  name: Get flight-s current position
+  type: http
+  seq: 8
+}
+
+get {
+  url: {{baseUrl}}/flights/:id/position
+  body: none
+  auth: none
+}
+
+params:path {
+  id: 
+}
+
+headers {
+  x-apikey: {{apiKey}}
+}

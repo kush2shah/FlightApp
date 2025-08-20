@@ -1,0 +1,23 @@
+meta {
+  name: Get the canonical code of an airport
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/airports/:id/canonical
+  body: none
+  auth: none
+}
+
+params:query {
+  ~id_type: 
+}
+
+params:path {
+  id: 
+}
+
+headers {
+  x-apikey: {{apiKey}}
+}

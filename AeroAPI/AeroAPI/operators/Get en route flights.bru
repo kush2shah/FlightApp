@@ -1,0 +1,15 @@
+meta {
+  name: Get en route flights
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{baseUrl}}/operators/:id/flights/enroute
+  body: none
+  auth: none
+}
+
+headers {
+  x-apikey: {{apiKey}}
+}

@@ -1,0 +1,21 @@
+meta {
+  name: Get AeroAPI usage statistics for account
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/account/usage
+  body: none
+  auth: none
+}
+
+params:query {
+  ~start: 
+  ~end: 
+  ~all_keys: 
+}
+
+headers {
+  x-apikey: {{apiKey}}
+}

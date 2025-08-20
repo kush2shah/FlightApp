@@ -1,0 +1,29 @@
+meta {
+  name: Get historical flights with a specific origin and destination
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{baseUrl}}/history/airports/:id/flights/to/:dest_id
+  body: none
+  auth: none
+}
+
+params:query {
+  start: 
+  end: 
+  ~airline: 
+  ~type: 
+  ~max_pages: 
+  ~cursor: 
+}
+
+params:path {
+  id: 
+  dest_id: 
+}
+
+headers {
+  x-apikey: {{apiKey}}
+}

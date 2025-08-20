@@ -1,0 +1,15 @@
+meta {
+  name: Modify specific alert
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{baseUrl}}/alerts/:id
+  body: none
+  auth: none
+}
+
+headers {
+  x-apikey: {{apiKey}}
+}

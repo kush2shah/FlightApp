@@ -1,0 +1,21 @@
+meta {
+  name: Search for flights
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/flights/search
+  body: none
+  auth: none
+}
+
+params:query {
+  ~query: 
+  ~max_pages: 
+  ~cursor: 
+}
+
+headers {
+  x-apikey: {{apiKey}}
+}

@@ -33,18 +33,13 @@ struct FlightRouteCard: View {
                 customProgressBar
             }
             
-            // Time Information with enhanced date context
+            // Time Information
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Departure")
                         .font(.caption)
                         .foregroundColor(.secondary)
                     FlightTimeView(time: times.departure, isArrival: false)
-                    if times.departure.relativeDate != times.arrival.relativeDate {
-                        Text(times.departure.smartDateDisplay)
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                    }
                 }
                 
                 Spacer()
@@ -54,12 +49,23 @@ struct FlightRouteCard: View {
                         .font(.caption)
                         .foregroundColor(.secondary)
                     FlightTimeView(time: times.arrival, isArrival: true)
-                    if times.departure.relativeDate != times.arrival.relativeDate {
-                        Text(times.arrival.smartDateDisplay)
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                    }
                 }
+            }
+            
+            // Show date context only when departure and arrival are on different dates
+            if times.departure.relativeDate != times.arrival.relativeDate {
+                HStack {
+                    Text(times.departure.relativeDate)
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                    
+                    Spacer()
+                    
+                    Text(times.arrival.relativeDate)
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+                .padding(.top, 4)
             }
             
             // Flight Duration

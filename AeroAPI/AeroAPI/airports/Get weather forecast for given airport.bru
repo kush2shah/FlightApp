@@ -1,0 +1,24 @@
+meta {
+  name: Get weather forecast for given airport
+  type: http
+  seq: 16
+}
+
+get {
+  url: {{baseUrl}}/airports/:id/weather/forecast
+  body: none
+  auth: none
+}
+
+params:query {
+  ~timestamp: 
+  ~return_nearby_weather: 
+}
+
+params:path {
+  id: 
+}
+
+headers {
+  x-apikey: {{apiKey}}
+}
