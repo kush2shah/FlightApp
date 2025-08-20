@@ -102,21 +102,6 @@ struct FlightAircraftCard: View {
                     }
                 }
                 
-                // Route description
-                if let route = flight.route, !route.isEmpty {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Route")
-                            .font(.subheadline)
-                            .fontWeight(.medium)
-                            .foregroundColor(.secondary)
-                        
-                        Text(route)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .lineLimit(2)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                }
             }
             .padding()
             .background(Color(.systemBackground))

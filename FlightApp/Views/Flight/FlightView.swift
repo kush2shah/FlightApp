@@ -40,6 +40,9 @@ struct FlightView: View {
                         // Aircraft and route details
                         FlightAircraftCard(flight: flight)
                         
+                        // Route map
+                        FlightRouteMapView(flight: flight)
+                        
                         // Airline profile section
                         airlineProfileSection
                         
