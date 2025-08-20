@@ -180,7 +180,21 @@ class WaypointDatabaseService {
 
 extension WaypointDatabaseService {
     
-    /// Parse a complete aviation route string using the waypoint database
+    /// Parse route using AeroAPI route data (preferred method)
+    func parseRouteFromAeroAPI(_ fixes: [RouteFix]) -> [CLLocationCoordinate2D] {
+        var coordinates: [CLLocationCoordinate2D] = []
+        
+        for fix in fixes {
+            if let coordinate = fix.coordinate {
+                coordinates.append(coordinate)
+            }
+        }
+        
+        print("🗺️ Parsed \(coordinates.count) waypoints from AeroAPI route data")
+        return coordinates
+    }
+    
+    /// Fallback: Parse a complete aviation route string using the waypoint database
     func parseRoute(_ routeString: String, origin: String, destination: String) -> [CLLocationCoordinate2D] {
         let components = routeString.components(separatedBy: " ")
         var coordinates: [CLLocationCoordinate2D] = []
@@ -223,6 +237,7 @@ extension WaypointDatabaseService {
             coordinates.append(destCoord)
         }
         
+        print("🗺️ Parsed \(coordinates.count) waypoints from route string fallback")
         return coordinates
     }
     

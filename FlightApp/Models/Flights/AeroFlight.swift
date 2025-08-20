@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import CoreLocation
 
 struct AeroFlightResponse: Codable {
     let flights: [AeroFlight]
@@ -307,4 +308,42 @@ struct AeroFlightDetails: Codable {
 enum FlightType: String, Codable {
     case generalAviation = "General_Aviation"
     case airline = "Airline"
+}
+
+// MARK: - Route Models
+
+struct AeroRouteResponse: Codable {
+    let routeDistance: String?
+    let fixes: [RouteFix]
+    
+    enum CodingKeys: String, CodingKey {
+        case routeDistance = "route_distance"
+        case fixes
+    }
+}
+
+struct RouteFix: Codable, Identifiable {
+    let id = UUID()
+    let name: String
+    let latitude: Double?
+    let longitude: Double?
+    let distanceFromLast: Double?
+    let distanceToDestination: Double?
+    let outboundCourse: Int?
+    let type: String
+    
+    enum CodingKeys: String, CodingKey {
+        case name
+        case latitude
+        case longitude
+        case distanceFromLast = "distance_from_last"
+        case distanceToDestination = "distance_to_destination"
+        case outboundCourse = "outbound_course"
+        case type
+    }
+    
+    var coordinate: CLLocationCoordinate2D? {
+        guard let lat = latitude, let lon = longitude else { return nil }
+        return CLLocationCoordinate2D(latitude: lat, longitude: lon)
+    }
 }

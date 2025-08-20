@@ -27,6 +27,9 @@ struct FlightView: View {
                         // Hero section with flight number and route
                         FlightHeroSection(flight: flight)
                         
+                        // Route map - prominently positioned
+                        FlightRouteMapView(flight: flight)
+                        
                         // Time and progress information
                         let flightTimes = viewModel.getFlightTimes()
                         FlightRouteCard(
@@ -39,9 +42,6 @@ struct FlightView: View {
                         
                         // Aircraft and route details
                         FlightAircraftCard(flight: flight)
-                        
-                        // Route map
-                        FlightRouteMapView(flight: flight)
                         
                         // Airline profile section
                         airlineProfileSection

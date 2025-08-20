@@ -11,6 +11,7 @@ import MapKit
 struct FlightRouteMapKitView: UIViewRepresentable {
     let flight: AeroFlight
     @State private var waypoints: [CLLocationCoordinate2D] = []
+    @State private var isLoadingRoute = false
     
     func makeUIView(context: Context) -> MKMapView {
         let mapView = MKMapView()
@@ -18,15 +19,15 @@ struct FlightRouteMapKitView: UIViewRepresentable {
         mapView.mapType = .standard
         mapView.showsUserLocation = false
         
-        // Parse waypoints and setup map
+        // Start loading waypoints asynchronously
         parseWaypoints()
-        setupMapView(mapView)
         
         return mapView
     }
     
     func updateUIView(_ uiView: MKMapView, context: Context) {
-        // Update map if needed
+        // Update map when waypoints change
+        setupMapView(uiView)
     }
     
     func makeCoordinator() -> Coordinator {
@@ -34,9 +35,50 @@ struct FlightRouteMapKitView: UIViewRepresentable {
     }
     
     private func parseWaypoints() {
-        guard let route = flight.route else { return }
+        // First try to get route data from AeroAPI
+        Task {
+            await loadRouteFromAPI()
+        }
+    }
+    
+    @MainActor
+    private func loadRouteFromAPI() async {
+        guard !isLoadingRoute else { return }
+        isLoadingRoute = true
         
-        // Use the proper waypoint database service to parse the entire route
+        do {
+            // Try to get route data from AeroAPI first
+            let routeResponse = try await AeroAPIService.shared.getFlightRoute(flight.faFlightId)
+            
+            if !routeResponse.fixes.isEmpty {
+                // Use AeroAPI route data (preferred)
+                let apiWaypoints = WaypointDatabaseService.shared.parseRouteFromAeroAPI(routeResponse.fixes)
+                self.waypoints = apiWaypoints
+                
+                print("🗺️ Loaded \(apiWaypoints.count) waypoints from AeroAPI")
+                for (index, waypoint) in apiWaypoints.enumerated() {
+                    print("  \(index): \(waypoint.latitude), \(waypoint.longitude)")
+                }
+            } else {
+                // Fallback to route string parsing
+                fallbackToRouteString()
+            }
+        } catch {
+            print("⚠️ Failed to load route from AeroAPI: \(error)")
+            // Fallback to route string parsing
+            fallbackToRouteString()
+        }
+        
+        isLoadingRoute = false
+    }
+    
+    private func fallbackToRouteString() {
+        guard let route = flight.route else {
+            print("⚠️ No route string available")
+            return
+        }
+        
+        // Use the fallback waypoint database service to parse the route string
         let parsedWaypoints = WaypointDatabaseService.shared.parseRoute(
             route,
             origin: flight.origin.displayCode,
@@ -45,10 +87,7 @@ struct FlightRouteMapKitView: UIViewRepresentable {
         
         self.waypoints = parsedWaypoints
         
-        print("🗺️ Parsed \(parsedWaypoints.count) waypoints from route: \(route)")
-        for (index, waypoint) in parsedWaypoints.enumerated() {
-            print("  \(index): \(waypoint.latitude), \(waypoint.longitude)")
-        }
+        print("🗺️ Fallback: Parsed \(parsedWaypoints.count) waypoints from route: \(route)")
     }
     
     

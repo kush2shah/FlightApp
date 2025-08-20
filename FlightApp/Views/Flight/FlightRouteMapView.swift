@@ -23,7 +23,7 @@ struct FlightRouteMapView: View {
             }
             
             FlightRouteMapKitView(flight: flight)
-                .frame(height: 200)
+                .frame(height: 300)
                 .cornerRadius(12)
                 .clipped()
         }
