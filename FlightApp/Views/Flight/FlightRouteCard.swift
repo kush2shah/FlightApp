@@ -33,13 +33,33 @@ struct FlightRouteCard: View {
                 customProgressBar
             }
             
-            // Time Information
+            // Time Information with enhanced date context
             HStack {
-                FlightTimeView(time: times.departure, isArrival: false)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Departure")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    FlightTimeView(time: times.departure, isArrival: false)
+                    if times.departure.relativeDate != times.arrival.relativeDate {
+                        Text(times.departure.smartDateDisplay)
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+                }
                 
                 Spacer()
                 
-                FlightTimeView(time: times.arrival, isArrival: true)
+                VStack(alignment: .trailing, spacing: 4) {
+                    Text("Arrival")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    FlightTimeView(time: times.arrival, isArrival: true)
+                    if times.departure.relativeDate != times.arrival.relativeDate {
+                        Text(times.arrival.smartDateDisplay)
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+                }
             }
             
             // Flight Duration

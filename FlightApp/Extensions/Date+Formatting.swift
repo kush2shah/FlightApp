@@ -56,4 +56,65 @@ extension Date {
         formatter.timeZone = timezone
         return formatter.string(from: self)
     }
+    
+    func smartRelativeDate(in timezone: TimeZone = .current) -> String {
+        let calendar = Calendar.current
+        var calendarWithTimezone = calendar
+        calendarWithTimezone.timeZone = timezone
+        
+        let now = Date()
+        let selfInTimezone = self
+        
+        if calendarWithTimezone.isDateInToday(selfInTimezone) {
+            return "Today"
+        } else if calendarWithTimezone.isDateInTomorrow(selfInTimezone) {
+            return "Tomorrow"
+        } else if calendarWithTimezone.isDateInYesterday(selfInTimezone) {
+            return "Yesterday"
+        } else {
+            let daysDiff = calendarWithTimezone.dateComponents([.day], from: now, to: selfInTimezone).day ?? 0
+            
+            if abs(daysDiff) <= 6 {
+                let formatter = DateFormatter()
+                formatter.timeZone = timezone
+                formatter.dateFormat = "EEEE"
+                return formatter.string(from: selfInTimezone)
+            } else {
+                let formatter = DateFormatter()
+                formatter.timeZone = timezone
+                formatter.dateFormat = "EEE, MMM d"
+                
+                if !calendarWithTimezone.isDate(selfInTimezone, equalTo: now, toGranularity: .year) {
+                    formatter.dateFormat = "EEE, MMM d, yyyy"
+                }
+                
+                return formatter.string(from: selfInTimezone)
+            }
+        }
+    }
+    
+    func flightDateWithContext(in timezone: TimeZone = .current) -> String {
+        let relativeDate = smartRelativeDate(in: timezone)
+        let formatter = DateFormatter()
+        formatter.timeZone = timezone
+        formatter.dateFormat = "MMM d"
+        
+        let calendar = Calendar.current
+        var calendarWithTimezone = calendar
+        calendarWithTimezone.timeZone = timezone
+        
+        if !calendarWithTimezone.isDate(self, equalTo: Date(), toGranularity: .year) {
+            formatter.dateFormat = "MMM d, yyyy"
+        }
+        
+        let standardDate = formatter.string(from: self)
+        
+        if relativeDate == "Today" || relativeDate == "Tomorrow" || relativeDate == "Yesterday" {
+            return "\(relativeDate) • \(standardDate)"
+        } else if relativeDate.contains(",") {
+            return relativeDate
+        } else {
+            return "\(relativeDate) • \(standardDate)"
+        }
+    }
 }

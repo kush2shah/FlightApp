@@ -24,6 +24,9 @@ struct FlightView: View {
             ScrollView {
                 VStack(spacing: 20) {
                     if let flight = viewModel.currentFlight {
+                        // Enhanced date header
+                        flightDateHeader(for: flight)
+                        
                         FlightHeaderView(flight: flight)
                         
                         // Add airline profile section here
@@ -130,6 +133,30 @@ struct FlightView: View {
             }
         }
     }
+    
+    // Enhanced date header for flight details
+    private func flightDateHeader(for flight: AeroFlight) -> some View {
+        Group {
+            if let scheduledOut = flight.scheduledOut,
+               let date = ISO8601DateFormatter().date(from: scheduledOut),
+               let timezone = TimeZone(identifier: flight.origin.timezone ?? "UTC") {
+                VStack(spacing: 8) {
+                    Text(date.smartRelativeDate(in: timezone))
+                        .font(.title2)
+                        .fontWeight(.bold)
+                        .foregroundColor(.primary)
+                    
+                    Text(date.flightDateWithContext(in: timezone))
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(Color(.systemGray6).opacity(0.5))
+                .cornerRadius(12)
+            }
+        }
+    }
 }
 
 struct FlightSelectionSheet: View {
@@ -137,72 +164,69 @@ struct FlightSelectionSheet: View {
     let flights: [AeroFlight]
     let onSelect: (AeroFlight) -> Void
     
+    private var groupedFlights: [(String, [AeroFlight])] {
+        let sorted = flights.sorted { first, second in
+            let firstDate = first.scheduledOut.flatMap { ISO8601DateFormatter().date(from: $0) } ?? .distantFuture
+            let secondDate = second.scheduledOut.flatMap { ISO8601DateFormatter().date(from: $0) } ?? .distantFuture
+            return firstDate < secondDate
+        }
+        
+        let grouped = Dictionary(grouping: sorted) { flight in
+            guard let scheduledOut = flight.scheduledOut,
+                  let date = ISO8601DateFormatter().date(from: scheduledOut),
+                  let timezone = TimeZone(identifier: flight.origin.timezone ?? "UTC") else {
+                return "Unknown Date"
+            }
+            return date.smartRelativeDate(in: timezone)
+        }
+        
+        return grouped.sorted { first, second in
+            let dateOrder = ["Today", "Tomorrow", "Yesterday"]
+            let firstIndex = dateOrder.firstIndex(of: first.key) ?? Int.max
+            let secondIndex = dateOrder.firstIndex(of: second.key) ?? Int.max
+            
+            if firstIndex != Int.max && secondIndex != Int.max {
+                return firstIndex < secondIndex
+            } else if firstIndex != Int.max {
+                return true
+            } else if secondIndex != Int.max {
+                return false
+            } else {
+                return first.key < second.key
+            }
+        }
+    }
+    
     var body: some View {
         NavigationStack {
             ScrollView {
-                LazyVStack(spacing: 12) {
-                    ForEach(flights, id: \.faFlightId) { flight in
-                        Button {
-                            print("🔵 Selected flight: \(flight.ident)")
-                            onSelect(flight)
-                            dismiss()
-                        } label: {
-                            VStack(alignment: .leading, spacing: 8) {
-                                // Flight identifier and status
-                                HStack {
-                                    Text("\(flight.operatorIata ?? flight.operator_ ?? "") \(flight.flightNumber ?? flight.ident)")
-                                        .font(.headline)
-                                    
-                                    Spacer()
-                                    
-                                    if flight.isInProgress {
-                                        Text("In Progress")
-                                            .font(.caption)
-                                            .padding(.horizontal, 8)
-                                            .padding(.vertical, 4)
-                                            .background(Color.green.opacity(0.2))
-                                            .foregroundColor(.green)
-                                            .cornerRadius(4)
-                                    }
-                                }
-                                
-                                // Times
-                                if let scheduledOut = flight.scheduledOut,
-                                   let date = ISO8601DateFormatter().date(from: scheduledOut) {
-                                    Text(date.formatted(date: .abbreviated, time: .shortened))
-                                        .font(.subheadline)
-                                        .foregroundColor(.secondary)
-                                }
-                                
-                                // Route information
-                                HStack {
-                                    VStack(alignment: .leading) {
-                                        Text(flight.origin.displayCode)
-                                        Text(flight.origin.city ?? "")
-                                            .font(.caption)
-                                            .foregroundColor(.secondary)
-                                    }
-                                    
-                                    Spacer()
-                                    
-                                    Image(systemName: "airplane")
-                                        .foregroundColor(.secondary)
-                                    
-                                    Spacer()
-                                    
-                                    VStack(alignment: .trailing) {
-                                        Text(flight.destination.displayCode)
-                                        Text(flight.destination.city ?? "")
-                                            .font(.caption)
-                                            .foregroundColor(.secondary)
-                                    }
-                                }
+                LazyVStack(spacing: 16) {
+                    ForEach(groupedFlights, id: \.0) { dateGroup, flights in
+                        VStack(alignment: .leading, spacing: 12) {
+                            // Date section header
+                            HStack {
+                                Text(dateGroup)
+                                    .font(.headline)
+                                    .foregroundColor(.primary)
+                                Spacer()
+                                Text("\(flights.count) flight\(flights.count == 1 ? "" : "s")")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
                             }
-                            .padding()
-                            .background(Color(.systemGray6))
-                            .cornerRadius(12)
+                            .padding(.horizontal)
+                            
+                            // Flights for this date
+                            ForEach(flights, id: \.faFlightId) { flight in
+                                Button {
+                                    print("🔵 Selected flight: \(flight.ident)")
+                                    onSelect(flight)
+                                    dismiss()
+                                } label: {
+                                    EnhancedFlightSelectionCard(flight: flight)
+                                }
+                                .buttonStyle(PlainButtonStyle())
+                            }
                         }
-                        .buttonStyle(PlainButtonStyle())
                     }
                 }
                 .padding()
@@ -210,6 +234,98 @@ struct FlightSelectionSheet: View {
             .navigationTitle("Select Flight")
             .navigationBarTitleDisplayMode(.inline)
         }
+    }
+}
+
+struct EnhancedFlightSelectionCard: View {
+    let flight: AeroFlight
+    
+    private var flightTime: String {
+        guard let scheduledOut = flight.scheduledOut,
+              let date = ISO8601DateFormatter().date(from: scheduledOut),
+              let timezone = TimeZone(identifier: flight.origin.timezone ?? "UTC") else {
+            return "--:--"
+        }
+        return date.formattedTime(in: timezone)
+    }
+    
+    private var statusInfo: (text: String, color: Color) {
+        if flight.cancelled {
+            return ("Cancelled", .red)
+        }
+        
+        if flight.isInProgress {
+            return ("In Progress", .green)
+        }
+        
+        if let departureDelay = flight.departureDelay, departureDelay > 0 {
+            let minutes = departureDelay / 60
+            return ("Delayed \(minutes)m", .orange)
+        }
+        
+        if let scheduledOut = flight.scheduledOut,
+           let date = ISO8601DateFormatter().date(from: scheduledOut),
+           date > Date() {
+            return ("Scheduled", .blue)
+        }
+        
+        return ("On Time", .green)
+    }
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // Flight header with time and status
+            HStack {
+                VStack(alignment: .leading) {
+                    Text("\(flight.operatorIata ?? flight.operator_ ?? "") \(flight.flightNumber ?? flight.ident)")
+                        .font(.headline)
+                    Text(flightTime)
+                        .font(.title2)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.primary)
+                }
+                
+                Spacer()
+                
+                Text(statusInfo.text)
+                    .font(.caption)
+                    .fontWeight(.medium)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(statusInfo.color.opacity(0.2))
+                    .foregroundColor(statusInfo.color)
+                    .cornerRadius(6)
+            }
+            
+            // Route information
+            HStack {
+                VStack(alignment: .leading) {
+                    Text(flight.origin.displayCode)
+                        .font(.headline)
+                    Text(flight.origin.city ?? "")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                
+                Spacer()
+                
+                Image(systemName: "airplane")
+                    .foregroundColor(.secondary)
+                
+                Spacer()
+                
+                VStack(alignment: .trailing) {
+                    Text(flight.destination.displayCode)
+                        .font(.headline)
+                    Text(flight.destination.city ?? "")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+        }
+        .padding()
+        .background(Color(.systemGray6))
+        .cornerRadius(12)
     }
 }
 
