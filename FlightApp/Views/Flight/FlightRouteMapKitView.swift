@@ -2,7 +2,7 @@
 //  FlightRouteMapKitView.swift
 //  FlightApp
 //
-//  Created by Kush Shah on 2/20/25.
+//  Created by Kush Shah on 8/20/25.
 //
 
 import SwiftUI
@@ -36,79 +36,21 @@ struct FlightRouteMapKitView: UIViewRepresentable {
     private func parseWaypoints() {
         guard let route = flight.route else { return }
         
-        let components = route.components(separatedBy: " ")
-        var parsedWaypoints: [CLLocationCoordinate2D] = []
-        
-        // Add origin airport
-        if let originCoord = AirportCoordinateService.shared.getCoordinate(for: flight.origin.displayCode)?.coordinate {
-            parsedWaypoints.append(originCoord)
-        }
-        
-        for component in components {
-            // Look for coordinate patterns like "5000N/05000W"
-            if let coordinate = parseCoordinate(from: component) {
-                parsedWaypoints.append(coordinate)
-            }
-            // Also check for known airports in the route
-            else if let airportCoord = AirportCoordinateService.shared.getCoordinate(for: component)?.coordinate {
-                parsedWaypoints.append(airportCoord)
-            }
-        }
-        
-        // Add destination airport
-        if let destCoord = AirportCoordinateService.shared.getCoordinate(for: flight.destination.displayCode)?.coordinate {
-            parsedWaypoints.append(destCoord)
-        }
+        // Use the proper waypoint database service to parse the entire route
+        let parsedWaypoints = WaypointDatabaseService.shared.parseRoute(
+            route,
+            origin: flight.origin.displayCode,
+            destination: flight.destination.displayCode
+        )
         
         self.waypoints = parsedWaypoints
+        
+        print("🗺️ Parsed \(parsedWaypoints.count) waypoints from route: \(route)")
+        for (index, waypoint) in parsedWaypoints.enumerated() {
+            print("  \(index): \(waypoint.latitude), \(waypoint.longitude)")
+        }
     }
     
-    private func parseCoordinate(from string: String) -> CLLocationCoordinate2D? {
-        let parts = string.components(separatedBy: "/")
-        guard parts.count == 2 else { return nil }
-        
-        let latString = parts[0]
-        let lonString = parts[1]
-        
-        // Extract latitude
-        guard latString.count >= 3,
-              let latDir = latString.last,
-              ["N", "S"].contains(String(latDir)) else { return nil }
-        
-        let latNumberString = String(latString.dropLast())
-        guard let latValue = Double(latNumberString) else { return nil }
-        
-        let latitude: Double
-        if latNumberString.count == 4 {
-            latitude = latValue / 100.0
-        } else if latNumberString.count == 2 {
-            latitude = latValue
-        } else {
-            return nil
-        }
-        
-        // Extract longitude
-        guard lonString.count >= 4,
-              let lonDir = lonString.last,
-              ["E", "W"].contains(String(lonDir)) else { return nil }
-        
-        let lonNumberString = String(lonString.dropLast())
-        guard let lonValue = Double(lonNumberString) else { return nil }
-        
-        let longitude: Double
-        if lonNumberString.count == 5 {
-            longitude = lonValue / 100.0
-        } else if lonNumberString.count == 3 {
-            longitude = lonValue
-        } else {
-            return nil
-        }
-        
-        let finalLatitude = latitude * (latDir == "N" ? 1 : -1)
-        let finalLongitude = longitude * (lonDir == "E" ? 1 : -1)
-        
-        return CLLocationCoordinate2D(latitude: finalLatitude, longitude: finalLongitude)
-    }
     
     private func setupMapView(_ mapView: MKMapView) {
         // Clear existing annotations and overlays

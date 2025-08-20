@@ -2,7 +2,7 @@
 //  FlightAircraftCard.swift
 //  FlightApp
 //
-//  Created by Kush Shah on 2/20/25.
+//  Created by Kush Shah on 8/20/25.
 //
 
 import SwiftUI
