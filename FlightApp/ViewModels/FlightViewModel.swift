@@ -91,7 +91,7 @@ class FlightViewModel: ObservableObject {
             actual: flight.actualOn,
             estimated: flight.estimatedOn,
             scheduled: flight.scheduledOn,
-            timezone: flight.destination.timezone ?? "UTC",
+            timezone: flight.destination?.timezone ?? "UTC",
             arrivalDelay: flight.arrivalDelay,
             isCancelled: flight.cancelled
         )

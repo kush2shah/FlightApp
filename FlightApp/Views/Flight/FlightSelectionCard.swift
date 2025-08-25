@@ -90,9 +90,9 @@ struct FlightSelectionCard: View {
                     Spacer()
                     
                     VStack(alignment: .trailing) {
-                        Text(flight.destination.displayCode)
+                        Text(flight.destination?.displayCode ?? "UNKNOWN")
                             .font(.headline)
-                        Text(flight.destination.city ?? "")
+                        Text(flight.destination?.city ?? "")
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }

@@ -23,8 +23,8 @@ struct FlightRouteCard: View {
                 Spacer()
                 
                 RouteEndpoint(
-                    code: flight.destination.displayCode,
-                    name: flight.destination.city ?? flight.destination.name ?? "Unknown"
+                    code: flight.destination?.displayCode ?? "UNKNOWN",
+                    name: flight.destination?.city ?? flight.destination?.name ?? "Unknown"
                 )
             }
             
