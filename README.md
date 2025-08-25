@@ -56,7 +56,7 @@ This project represents an exploration of modern development workflows, particul
 
 ## Privacy & Terms
 
-FlightApp respects user privacy and only collects necessary flight data for functionality. See [Privacy Policy](Privacy%20Policy.md) and [Terms and Conditions](Terms%20and%20Conditions.md) for details.
+FlightApp respects user privacy and only collects necessary flight data for functionality. See [Privacy Policy](https://kushs.org/app-privacy) and [Terms and Conditions](https://kushs.org/app-terms) for details.
 
 ## Contact
  
