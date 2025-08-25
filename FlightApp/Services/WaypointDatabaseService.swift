@@ -285,15 +285,48 @@ extension WaypointDatabaseService {
     /// Parse route using AeroAPI route data (preferred method)
     func parseRouteFromAeroAPI(_ fixes: [RouteFix]) -> [CLLocationCoordinate2D] {
         var coordinates: [CLLocationCoordinate2D] = []
+        var lastCoordinate: CLLocationCoordinate2D?
         
         for fix in fixes {
-            if let coordinate = fix.coordinate {
-                coordinates.append(coordinate)
+            guard let coordinate = fix.coordinate else { continue }
+            
+            // Validate coordinate ranges
+            guard abs(coordinate.latitude) <= 90.0 && abs(coordinate.longitude) <= 180.0 else {
+                print("⚠️ Invalid coordinate for \(fix.name): \(coordinate.latitude), \(coordinate.longitude)")
+                continue
             }
+            
+            // Skip duplicate consecutive coordinates
+            if let last = lastCoordinate,
+               abs(last.latitude - coordinate.latitude) < 0.001 &&
+               abs(last.longitude - coordinate.longitude) < 0.001 {
+                continue
+            }
+            
+            // For international flights, filter out obviously incorrect waypoints
+            // by checking if the waypoint makes geographical sense relative to the previous one
+            if let last = lastCoordinate {
+                let distance = distanceBetween(last, coordinate)
+                // Skip waypoints that are unreasonably far (likely coordinate errors)
+                if distance > 2000 { // 2000km threshold for single waypoint jump
+                    print("⚠️ Skipping waypoint \(fix.name) - too far from previous: \(Int(distance))km")
+                    continue
+                }
+            }
+            
+            coordinates.append(coordinate)
+            lastCoordinate = coordinate
         }
         
-        print("🗺️ Parsed \(coordinates.count) waypoints from AeroAPI route data")
+        print("🗺️ Parsed \(coordinates.count) valid waypoints from \(fixes.count) AeroAPI fixes")
         return coordinates
+    }
+    
+    /// Calculate distance between two coordinates in kilometers
+    private func distanceBetween(_ coord1: CLLocationCoordinate2D, _ coord2: CLLocationCoordinate2D) -> Double {
+        let location1 = CLLocation(latitude: coord1.latitude, longitude: coord1.longitude)
+        let location2 = CLLocation(latitude: coord2.latitude, longitude: coord2.longitude)
+        return location1.distance(from: location2) / 1000.0 // Convert to km
     }
     
     /// Fallback: Parse a complete aviation route string using the waypoint database
