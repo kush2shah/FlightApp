@@ -46,27 +46,37 @@ struct FlightRouteMapKitView: UIViewRepresentable {
         guard !isLoadingRoute else { return }
         isLoadingRoute = true
         
+        // Try route string first (more reliable for international routes)
+        if let route = flight.route, !route.isEmpty {
+            print("🗺️ Using route string: \(route)")
+            let parsedWaypoints = WaypointDatabaseService.shared.parseRoute(
+                route,
+                origin: flight.origin.displayCode,
+                destination: flight.destination.displayCode
+            )
+            
+            if !parsedWaypoints.isEmpty {
+                self.waypoints = parsedWaypoints
+                print("🗺️ Loaded \(parsedWaypoints.count) waypoints from route string")
+                for (index, waypoint) in parsedWaypoints.enumerated() {
+                    print("  \(index): \(waypoint.latitude), \(waypoint.longitude)")
+                }
+                isLoadingRoute = false
+                return
+            }
+        }
+        
+        // Fallback to AeroAPI if route string parsing didn't work
         do {
-            // Try to get route data from AeroAPI first
             let routeResponse = try await AeroAPIService.shared.getFlightRoute(flight.faFlightId)
             
             if !routeResponse.fixes.isEmpty {
-                // Use AeroAPI route data (preferred)
                 let apiWaypoints = WaypointDatabaseService.shared.parseRouteFromAeroAPI(routeResponse.fixes)
                 self.waypoints = apiWaypoints
-                
-                print("🗺️ Loaded \(apiWaypoints.count) waypoints from AeroAPI")
-                for (index, waypoint) in apiWaypoints.enumerated() {
-                    print("  \(index): \(waypoint.latitude), \(waypoint.longitude)")
-                }
-            } else {
-                // Fallback to route string parsing
-                fallbackToRouteString()
+                print("🗺️ Fallback: Loaded \(apiWaypoints.count) waypoints from AeroAPI")
             }
         } catch {
-            print("⚠️ Failed to load route from AeroAPI: \(error)")
-            // Fallback to route string parsing
-            fallbackToRouteString()
+            print("⚠️ Failed to load route from both sources: \(error)")
         }
         
         isLoadingRoute = false
