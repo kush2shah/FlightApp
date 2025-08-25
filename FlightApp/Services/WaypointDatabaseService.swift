@@ -234,8 +234,17 @@ class WaypointDatabaseService {
     
     /// Load waypoints from CSV file
     private func loadCSVWaypoints() {
+        // Try to load the comprehensive navigation database first
+        if let path = Bundle.main.path(forResource: "complete_navigation_database", ofType: "csv"),
+           let content = try? String(contentsOfFile: path) {
+            print("📍 Loading from comprehensive navigation database...")
+            parseCSVContent(content, source: "ARINC424")
+            return
+        }
+        
+        // Fallback to bundled international waypoints
         guard let path = Bundle.main.path(forResource: "international_waypoints", ofType: "csv") else {
-            print("⚠️ international_waypoints.csv not found in bundle")
+            print("⚠️ No waypoint database found in bundle")
             return
         }
         
@@ -244,6 +253,10 @@ class WaypointDatabaseService {
             return
         }
         
+        parseCSVContent(content, source: "bundled")
+    }
+    
+    private func parseCSVContent(_ content: String, source: String) {
         let lines = content.components(separatedBy: .newlines)
         var loadedCount = 0
         
@@ -252,15 +265,38 @@ class WaypointDatabaseService {
             guard !line.isEmpty else { continue }
             
             let components = line.components(separatedBy: ",")
-            guard components.count >= 6 else { continue }
             
-            let identifier = components[0].trimmingCharacters(in: .whitespaces)
-            guard let latitude = Double(components[1]),
-                  let longitude = Double(components[2]) else { continue }
+            // Handle different CSV formats
+            var identifier: String
+            var latitude: Double
+            var longitude: Double
+            var type: String
+            var usage: String
+            var region: String
             
-            let type = components[3].trimmingCharacters(in: .whitespaces)
-            let usage = components[4].trimmingCharacters(in: .whitespaces)
-            let region = components[5].trimmingCharacters(in: .whitespaces)
+            if source == "ARINC424" && components.count >= 7 {
+                // ARINC 424 format: identifier,latitude,longitude,type,nav_type,usage,region
+                identifier = components[0].trimmingCharacters(in: .whitespaces)
+                guard let lat = Double(components[1]),
+                      let lon = Double(components[2]) else { continue }
+                latitude = lat
+                longitude = lon
+                type = components[3].trimmingCharacters(in: .whitespaces)
+                usage = components[5].trimmingCharacters(in: .whitespaces)
+                region = components.count > 6 ? components[6].trimmingCharacters(in: .whitespaces) : ""
+            } else if components.count >= 6 {
+                // Bundled format: identifier,latitude,longitude,type,usage,region
+                identifier = components[0].trimmingCharacters(in: .whitespaces)
+                guard let lat = Double(components[1]),
+                      let lon = Double(components[2]) else { continue }
+                latitude = lat
+                longitude = lon
+                type = components[3].trimmingCharacters(in: .whitespaces)
+                usage = components[4].trimmingCharacters(in: .whitespaces)
+                region = components[5].trimmingCharacters(in: .whitespaces)
+            } else {
+                continue
+            }
             
             let waypoint = WaypointData(
                 identifier: identifier,
@@ -274,7 +310,7 @@ class WaypointDatabaseService {
             loadedCount += 1
         }
         
-        print("📍 Loaded \(loadedCount) waypoints from CSV database")
+        print("📍 Loaded \(loadedCount) waypoints from \(source) database")
     }
 }
 
@@ -282,18 +318,93 @@ class WaypointDatabaseService {
 
 extension WaypointDatabaseService {
     
-    /// Parse route using AeroAPI route data (preferred method)
+    /// Parse route using AeroAPI route data and comprehensive waypoint database
     func parseRouteFromAeroAPI(_ fixes: [RouteFix]) -> [CLLocationCoordinate2D] {
         var coordinates: [CLLocationCoordinate2D] = []
+        var lastValidCoordinate: CLLocationCoordinate2D?
         
         for fix in fixes {
-            if let coordinate = fix.coordinate {
-                coordinates.append(coordinate)
+            var coordinateToAdd: CLLocationCoordinate2D?
+            
+            // First, try using AeroAPI coordinates if they seem valid
+            if let coordinate = fix.coordinate,
+               abs(coordinate.latitude) <= 90.0 && abs(coordinate.longitude) <= 180.0 {
+                
+                // Validate that coordinate makes geographical sense
+                if let last = lastValidCoordinate {
+                    let distance = distanceBetween(last, coordinate)
+                    // Skip coordinates that jump too far back (likely data errors)
+                    if distance > 15000 { // 15000km max - more than halfway around Earth
+                        print("⚠️ Skipping \(fix.name) AeroAPI coordinate - too far: \(Int(distance))km")
+                    } else {
+                        coordinateToAdd = coordinate
+                    }
+                } else {
+                    coordinateToAdd = coordinate
+                }
+            }
+            
+            // If AeroAPI coordinate not used, try waypoint database
+            if coordinateToAdd == nil {
+                if let waypoint = getWaypoint(identifier: fix.name) {
+                    coordinateToAdd = waypoint.coordinate
+                    print("📍 Resolved \(fix.name) from waypoint database: \(waypoint.coordinate)")
+                } else {
+                    // Skip unresolved waypoints (likely airway identifiers)
+                    print("⚠️ Skipping unresolved waypoint: \(fix.name)")
+                    continue
+                }
+            }
+            
+            if let coord = coordinateToAdd {
+                coordinates.append(coord)
+                lastValidCoordinate = coord
             }
         }
         
-        print("🗺️ Parsed \(coordinates.count) waypoints from AeroAPI route data")
+        print("🗺️ Parsed \(coordinates.count) valid waypoints from \(fixes.count) AeroAPI fixes")
         return coordinates
+    }
+    
+    /// Calculate distance between two coordinates in kilometers
+    private func distanceBetween(_ coord1: CLLocationCoordinate2D, _ coord2: CLLocationCoordinate2D) -> Double {
+        let location1 = CLLocation(latitude: coord1.latitude, longitude: coord1.longitude)
+        let location2 = CLLocation(latitude: coord2.latitude, longitude: coord2.longitude)
+        return location1.distance(from: location2) / 1000.0 // Convert to km
+    }
+    
+    /// Determine if a segment is likely transoceanic (crossing major water bodies)
+    private func isTransoceanicSegment(from start: CLLocationCoordinate2D, to end: CLLocationCoordinate2D) -> Bool {
+        // Atlantic crossing (Americas to Europe/Africa)
+        if (start.longitude < -30 && end.longitude > -10) || (start.longitude > -10 && end.longitude < -30) {
+            return true
+        }
+        
+        // Pacific crossing (Americas to Asia/Oceania)
+        if (start.longitude < -100 && end.longitude > 100) || (start.longitude > 100 && end.longitude < -100) {
+            return true
+        }
+        
+        // Large longitude difference indicates potential ocean crossing
+        let longitudeDiff = abs(start.longitude - end.longitude)
+        if longitudeDiff > 60 { // More than 60 degrees longitude difference
+            return true
+        }
+        
+        return false
+    }
+    
+    /// Check if component is a speed/altitude annotation (M083F300, N0483F300)
+    private func isSpeedAltitudeAnnotation(_ component: String) -> Bool {
+        if component.count < 6 { return false }
+        
+        // Check for Mach speed (M083F300) or indicated airspeed (N0483F300)
+        if (component.starts(with: "M") || component.starts(with: "N")) && component.contains("F") {
+            let parts = component.dropFirst().split(separator: "F")
+            return parts.count == 2 && parts.allSatisfy { $0.allSatisfy(\.isNumber) }
+        }
+        
+        return false
     }
     
     /// Fallback: Parse a complete aviation route string using the waypoint database
@@ -310,23 +421,55 @@ extension WaypointDatabaseService {
             let cleanComponent = component.trimmingCharacters(in: .whitespaces)
             guard !cleanComponent.isEmpty else { continue }
             
-            // Skip airway designators (UL975, M16, L603, P2, etc.)
-            if isAirwayDesignator(cleanComponent) { continue }
+            // Skip speed/altitude annotations (M083F300, N0483F300, etc.)
+            if isSpeedAltitudeAnnotation(cleanComponent) { continue }
             
-            // Skip NAT track references (NATV, NATW, NATU, etc.)
-            if cleanComponent.hasPrefix("NAT") && cleanComponent.count == 4 { continue }
+            // Skip "DCT" (Direct To) routing instructions
+            if cleanComponent == "DCT" { continue }
             
-            // Skip organized track system references (like N97B, N357C, N271B)
-            if isOrganizedTrackSystem(cleanComponent) { continue }
-            
-            // Parse oceanic coordinates (5000N/05000W format)
+            // First, try to parse oceanic coordinates (both 4100N/06000W and 28S142E formats)
             if let coordinate = parseOceanicCoordinate(cleanComponent) {
                 coordinates.append(coordinate)
+                print("📍 Parsed oceanic coordinate \(cleanComponent): \(coordinate)")
                 continue
             }
             
-            // Look up waypoint in database
-            if let waypoint = getWaypoint(identifier: cleanComponent) {
+            // If that fails, try parsing just the coordinate part (for combined formats like 28S142E/N0497F320)
+            if cleanComponent.contains("/") {
+                let coordinatePart = cleanComponent.components(separatedBy: "/").first ?? cleanComponent
+                if coordinatePart != cleanComponent, let coordinate = parseOceanicCoordinate(coordinatePart) {
+                    coordinates.append(coordinate)
+                    print("📍 Parsed oceanic coordinate \(coordinatePart) from \(cleanComponent): \(coordinate)")
+                    continue
+                }
+            }
+            
+            // Extract waypoint name from combined waypoint/speed (OLREL/N0483F300 -> OLREL)
+            let waypointName = cleanComponent.components(separatedBy: "/").first ?? cleanComponent
+            
+            // Skip airway designators (UL975, M16, L603, P2, N774, H530, A576, etc.)
+            if isAirwayDesignator(waypointName) { 
+                print("🛤️ Skipping airway designator: \(waypointName)")
+                continue 
+            }
+            
+            // Skip NAT track references (NATV, NATW, NATU, etc.)
+            if waypointName.hasPrefix("NAT") && waypointName.count == 4 { continue }
+            
+            // Skip organized track system references (like N97B, N357C, N271B)
+            if isOrganizedTrackSystem(waypointName) { continue }
+            
+            // Look up waypoint in database with geographic context
+            if let waypoint = getWaypoint(identifier: waypointName) {
+                // Filter out waypoints that don't make geographical sense for international routes
+                if !coordinates.isEmpty, let lastCoord = coordinates.last {
+                    let distance = distanceBetween(lastCoord, waypoint.coordinate)
+                    // Skip waypoints that require >5000km jump (likely wrong region)
+                    if distance > 5000 {
+                        print("⚠️ Skipping \(cleanComponent) - too far from route: \(Int(distance))km")
+                        continue
+                    }
+                }
                 coordinates.append(waypoint.coordinate)
                 continue
             }
@@ -367,27 +510,63 @@ extension WaypointDatabaseService {
     }
     
     private func parseOceanicCoordinate(_ string: String) -> CLLocationCoordinate2D? {
-        let parts = string.components(separatedBy: "/")
-        guard parts.count == 2 else { return nil }
+        // Handle format like "4100N/06000W"
+        if string.contains("/") {
+            let parts = string.components(separatedBy: "/")
+            guard parts.count == 2 else { 
+                print("⚠️ Failed to split coordinate: \(string)")
+                return nil 
+            }
+            
+            let latString = parts[0]
+            let lonString = parts[1]
+            
+            guard let latDir = latString.last,
+                  let lonDir = lonString.last,
+                  ["N", "S"].contains(String(latDir)),
+                  ["E", "W"].contains(String(lonDir)) else { 
+                print("⚠️ Invalid direction in coordinate: \(string)")
+                return nil 
+            }
+            
+            let latNumbers = String(latString.dropLast())
+            let lonNumbers = String(lonString.dropLast())
+            
+            guard let latValue = Double(latNumbers),
+                  let lonValue = Double(lonNumbers) else { 
+                print("⚠️ Failed to parse numbers in coordinate: \(string) (lat: \(latNumbers), lon: \(lonNumbers))")
+                return nil 
+            }
+            
+            let latitude = (latNumbers.count == 4 ? latValue / 100.0 : latValue) * (latDir == "N" ? 1 : -1)
+            let longitude = (lonNumbers.count >= 4 ? lonValue / 100.0 : lonValue) * (lonDir == "E" ? 1 : -1)
+            
+            print("📍 Successfully parsed \(string) → lat: \(latitude), lon: \(longitude)")
+            return CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+        }
         
-        let latString = parts[0]
-        let lonString = parts[1]
+        // Handle format like "28S142E"
+        let regex = try? NSRegularExpression(pattern: #"(\d+)([NS])(\d+)([EW])"#, options: [])
+        let nsRange = NSRange(string.startIndex..<string.endIndex, in: string)
         
-        // Handle formats like "5000N/05000W"
-        guard let latDir = latString.last,
-              let lonDir = lonString.last,
-              ["N", "S"].contains(String(latDir)),
-              ["E", "W"].contains(String(lonDir)) else { return nil }
+        if let match = regex?.firstMatch(in: string, options: [], range: nsRange) {
+            let latRange = Range(match.range(at: 1), in: string)!
+            let latDirRange = Range(match.range(at: 2), in: string)!
+            let lonRange = Range(match.range(at: 3), in: string)!
+            let lonDirRange = Range(match.range(at: 4), in: string)!
+            
+            guard let latValue = Double(String(string[latRange])),
+                  let lonValue = Double(String(string[lonRange])) else { return nil }
+            
+            let latDir = String(string[latDirRange])
+            let lonDir = String(string[lonDirRange])
+            
+            let latitude = latValue * (latDir == "N" ? 1 : -1)
+            let longitude = lonValue * (lonDir == "E" ? 1 : -1)
+            
+            return CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+        }
         
-        let latNumbers = String(latString.dropLast())
-        let lonNumbers = String(lonString.dropLast())
-        
-        guard let latValue = Double(latNumbers),
-              let lonValue = Double(lonNumbers) else { return nil }
-        
-        let latitude = (latNumbers.count == 4 ? latValue / 100.0 : latValue) * (latDir == "N" ? 1 : -1)
-        let longitude = (lonNumbers.count == 5 ? lonValue / 100.0 : lonValue) * (lonDir == "E" ? 1 : -1)
-        
-        return CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+        return nil
     }
 }
