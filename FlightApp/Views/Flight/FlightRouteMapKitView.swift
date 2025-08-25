@@ -52,7 +52,7 @@ struct FlightRouteMapKitView: UIViewRepresentable {
             let parsedWaypoints = WaypointDatabaseService.shared.parseRoute(
                 route,
                 origin: flight.origin.displayCode,
-                destination: flight.destination.displayCode
+                destination: flight.destination?.displayCode ?? "UNKNOWN"
             )
             
             if !parsedWaypoints.isEmpty {
@@ -92,7 +92,7 @@ struct FlightRouteMapKitView: UIViewRepresentable {
         let parsedWaypoints = WaypointDatabaseService.shared.parseRoute(
             route,
             origin: flight.origin.displayCode,
-            destination: flight.destination.displayCode
+            destination: flight.destination?.displayCode ?? "UNKNOWN"
         )
         
         self.waypoints = parsedWaypoints
@@ -108,10 +108,10 @@ struct FlightRouteMapKitView: UIViewRepresentable {
         
         // Add airport annotations
         let originCoord = AirportCoordinateService.shared.getCoordinate(for: flight.origin.displayCode)?.coordinate ?? CLLocationCoordinate2D(latitude: 0, longitude: 0)
-        let destCoord = AirportCoordinateService.shared.getCoordinate(for: flight.destination.displayCode)?.coordinate ?? CLLocationCoordinate2D(latitude: 0, longitude: 0)
+        let destCoord = AirportCoordinateService.shared.getCoordinate(for: flight.destination?.displayCode ?? "")?.coordinate ?? CLLocationCoordinate2D(latitude: 0, longitude: 0)
         
         let originAnnotation = AirportAnnotation(coordinate: originCoord, title: flight.origin.displayCode, isOrigin: true)
-        let destAnnotation = AirportAnnotation(coordinate: destCoord, title: flight.destination.displayCode, isOrigin: false)
+        let destAnnotation = AirportAnnotation(coordinate: destCoord, title: flight.destination?.displayCode ?? "UNKNOWN", isOrigin: false)
         
         mapView.addAnnotations([originAnnotation, destAnnotation])
         

@@ -538,8 +538,15 @@ extension WaypointDatabaseService {
                 return nil 
             }
             
-            let latitude = (latNumbers.count == 4 ? latValue / 100.0 : latValue) * (latDir == "N" ? 1 : -1)
-            let longitude = (lonNumbers.count >= 4 ? lonValue / 100.0 : lonValue) * (lonDir == "E" ? 1 : -1)
+            // Parse latitude: DDMM format (e.g., "0649" = 06°49' = 6.816°)
+            let latDegrees = latNumbers.count == 4 ? Int(latValue / 100.0) : Int(latValue)
+            let latMinutes = latNumbers.count == 4 ? Int(latValue.truncatingRemainder(dividingBy: 100)) : 0
+            let latitude = (Double(latDegrees) + Double(latMinutes) / 60.0) * (latDir == "N" ? 1 : -1)
+            
+            // Parse longitude: DDDMM or DDMM format (e.g., "08043" = 080°43' = 80.716°)
+            let lonDegrees = lonNumbers.count >= 4 ? Int(lonValue / 100.0) : Int(lonValue)
+            let lonMinutes = lonNumbers.count >= 4 ? Int(lonValue.truncatingRemainder(dividingBy: 100)) : 0
+            let longitude = (Double(lonDegrees) + Double(lonMinutes) / 60.0) * (lonDir == "E" ? 1 : -1)
             
             print("📍 Successfully parsed \(string) → lat: \(latitude), lon: \(longitude)")
             return CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
@@ -561,8 +568,15 @@ extension WaypointDatabaseService {
             let latDir = String(string[latDirRange])
             let lonDir = String(string[lonDirRange])
             
-            let latitude = latValue * (latDir == "N" ? 1 : -1)
-            let longitude = lonValue * (lonDir == "E" ? 1 : -1)
+            // Parse latitude: DDMM format (e.g., 0649 = 06°49' = 6.816°)
+            let latDegrees = Int(latValue / 100.0)
+            let latMinutes = Int(latValue.truncatingRemainder(dividingBy: 100))
+            let latitude = (Double(latDegrees) + Double(latMinutes) / 60.0) * (latDir == "N" ? 1 : -1)
+            
+            // Parse longitude: DDDMM or DDMM format (e.g., 08043 = 080°43' = 80.716°)
+            let lonDegrees = Int(lonValue / 100.0)
+            let lonMinutes = Int(lonValue.truncatingRemainder(dividingBy: 100))
+            let longitude = (Double(lonDegrees) + Double(lonMinutes) / 60.0) * (lonDir == "E" ? 1 : -1)
             
             return CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
         }

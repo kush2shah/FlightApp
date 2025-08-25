@@ -26,8 +26,8 @@ struct RouteInformationView: View {
             Spacer()
             
             AirportView(
-                code: flight.destination.displayCode,
-                city: flight.destination.city ?? "",
+                code: flight.destination?.displayCode ?? "UNKNOWN",
+                city: flight.destination?.city ?? "",
                 alignment: .trailing
             )
         }

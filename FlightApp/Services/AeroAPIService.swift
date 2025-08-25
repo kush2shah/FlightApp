@@ -105,8 +105,11 @@ class AeroAPIService {
             // Decode the response
             let flightResponse = try decoder.decode(AeroFlightResponse.self, from: data)
             
+            // Filter out flights without destinations (position-only flights, etc.)
+            let validFlights = flightResponse.flights.filter { $0.destination != nil }
+            
             // Sort flights by scheduled departure time
-            let sortedFlights = flightResponse.flights.sorted { first, second in
+            let sortedFlights = validFlights.sorted { first, second in
                 let firstDate = first.scheduledOut.flatMap { ISO8601DateFormatter().date(from: $0) } ?? .distantFuture
                 let secondDate = second.scheduledOut.flatMap { ISO8601DateFormatter().date(from: $0) } ?? .distantFuture
                 return firstDate < secondDate

@@ -61,21 +61,21 @@ struct PopularRouteStore {
             destinationFlag: "🇦🇺"
         ),
         PopularRoute(
-            flightNumber: "JL46",
-            origin: "Paris",
-            destination: "Tokyo",
-            originCode: "CDG",
-            destinationCode: "HND",
-            originFlag: "🇫🇷",
-            destinationFlag: "🇯🇵"
+            flightNumber: "UA1",
+            origin: "San Francisco",
+            destination: "Singapore",
+            originCode: "SFO",
+            destinationCode: "SIN",
+            originFlag: "🇺🇸",
+            destinationFlag: "🇸🇬"
         ),
         PopularRoute(
-            flightNumber: "AA82",
-            origin: "Auckland",
+            flightNumber: "AA1",
+            origin: "New York",
             destination: "Los Angeles",
-            originCode: "AKL",
+            originCode: "JFK",
             destinationCode: "LAX",
-            originFlag: "🇳🇿",
+            originFlag: "🇺🇸",
             destinationFlag: "🇺🇸"
         ),
         PopularRoute(
@@ -88,22 +88,22 @@ struct PopularRouteStore {
             destinationFlag: "🇲🇾"
         ),
         PopularRoute(
-            flightNumber: "BA668",
+            flightNumber: "BA175",
             origin: "London",
-            destination: "Marrakesh",
+            destination: "New York",
             originCode: "LHR",
-            destinationCode: "RAK",
+            destinationCode: "JFK",
             originFlag: "🇬🇧",
-            destinationFlag: "🇲🇦"
+            destinationFlag: "🇺🇸"
         ),
         PopularRoute(
-            flightNumber: "QR921",
-            origin: "Alask",
-            destination: "Doha",
-            originCode: "ALK",
-            destinationCode: "DOH",
-            originFlag: "🇺🇸",
-            destinationFlag: "🇶🇦"
+            flightNumber: "LH440",
+            origin: "Frankfurt",
+            destination: "Houston",
+            originCode: "FRA",
+            destinationCode: "IAH",
+            originFlag: "🇩🇪",
+            destinationFlag: "🇺🇸"
         ),
         PopularRoute(
             flightNumber: "QF34",

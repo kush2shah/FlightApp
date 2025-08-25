@@ -40,7 +40,7 @@ struct AeroFlight: Codable, Identifiable {
     let codeshares: [String]?
     let codeshares_iata: [String]?
     let origin: AeroAirport
-    let destination: AeroAirport
+    let destination: AeroAirport?
     let departureDelay: Int?
     let arrivalDelay: Int?
     let filedEte: Int?
@@ -223,7 +223,7 @@ struct AeroFlightDetails: Codable {
     let inboundFaFlightId: String?
     let type: FlightType
     let origin: AeroAirport
-    let destination: AeroAirport
+    let destination: AeroAirport?
     let departureDelay: Int?
     let arrivalDelay: Int?
     let filedEte: Int?
