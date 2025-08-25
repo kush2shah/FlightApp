@@ -1,0 +1,15 @@
+meta {
+  name: Get delay information for all airports with delays
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/airports/delays
+  body: none
+  auth: none
+}
+
+headers {
+  x-apikey: {{apiKey}}
+}

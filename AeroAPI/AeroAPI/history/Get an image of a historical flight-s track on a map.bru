@@ -1,0 +1,30 @@
+meta {
+  name: Get an image of a historical flight-s track on a map
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/history/flights/:id/map
+  body: none
+  auth: none
+}
+
+params:query {
+  ~height: 
+  ~width: 
+  ~layer_on: 
+  ~layer_off: 
+  ~show_data_block: 
+  ~airports_expand_view: 
+  ~show_airports: 
+  ~bounding_box: 
+}
+
+params:path {
+  id: 
+}
+
+headers {
+  x-apikey: {{apiKey}}
+}

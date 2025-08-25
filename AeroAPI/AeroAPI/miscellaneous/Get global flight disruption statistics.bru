@@ -1,0 +1,15 @@
+meta {
+  name: Get global flight disruption statistics
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/disruption_counts/:entity_type
+  body: none
+  auth: none
+}
+
+headers {
+  x-apikey: {{apiKey}}
+}

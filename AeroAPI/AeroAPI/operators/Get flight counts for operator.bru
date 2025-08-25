@@ -1,0 +1,15 @@
+meta {
+  name: Get flight counts for operator
+  type: http
+  seq: 8
+}
+
+get {
+  url: {{baseUrl}}/operators/:id/flights/counts
+  body: none
+  auth: none
+}
+
+headers {
+  x-apikey: {{apiKey}}
+}

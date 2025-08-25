@@ -1,0 +1,15 @@
+meta {
+  name: Get the owner of an aircraft
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/aircraft/:ident/owner
+  body: none
+  auth: none
+}
+
+headers {
+  x-apikey: {{apiKey}}
+}

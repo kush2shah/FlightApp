@@ -14,6 +14,8 @@ struct FlightTime {
     let scheduledTime: String?
     let estimatedTime: String?
     let date: String
+    let fullDate: Date?
+    let timezone: TimeZone?
     let isEarly: Bool
     let isDelayed: Bool
     let minutesDifference: Int?
@@ -34,6 +36,20 @@ struct FlightTime {
         return nil
     }
     
+    var smartDateDisplay: String {
+        guard let fullDate = fullDate, let timezone = timezone else {
+            return date
+        }
+        return fullDate.flightDateWithContext(in: timezone)
+    }
+    
+    var relativeDate: String {
+        guard let fullDate = fullDate, let timezone = timezone else {
+            return date
+        }
+        return fullDate.smartRelativeDate(in: timezone)
+    }
+    
     init(
         displayTime: String,
         displayTimezone: String,
@@ -41,6 +57,8 @@ struct FlightTime {
         scheduledTime: String? = nil,
         estimatedTime: String? = nil,
         date: String,
+        fullDate: Date? = nil,
+        timezone: TimeZone? = nil,
         isEarly: Bool = false,
         isDelayed: Bool = false,
         minutesDifference: Int? = nil,
@@ -52,6 +70,8 @@ struct FlightTime {
         self.scheduledTime = scheduledTime
         self.estimatedTime = estimatedTime
         self.date = date
+        self.fullDate = fullDate
+        self.timezone = timezone
         self.isEarly = isEarly
         self.isDelayed = isDelayed
         self.minutesDifference = minutesDifference

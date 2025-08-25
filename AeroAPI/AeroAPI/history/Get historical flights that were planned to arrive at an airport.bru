@@ -1,0 +1,28 @@
+meta {
+  name: Get historical flights that were planned to arrive at an airport
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/history/airports/:id/flights/arrivals
+  body: none
+  auth: none
+}
+
+params:query {
+  start: 
+  end: 
+  ~airline: 
+  ~type: 
+  ~max_pages: 
+  ~cursor: 
+}
+
+params:path {
+  id: 
+}
+
+headers {
+  x-apikey: {{apiKey}}
+}

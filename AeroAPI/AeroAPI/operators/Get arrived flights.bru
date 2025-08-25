@@ -1,0 +1,15 @@
+meta {
+  name: Get arrived flights
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/operators/:id/flights/arrivals
+  body: none
+  auth: none
+}
+
+headers {
+  x-apikey: {{apiKey}}
+}

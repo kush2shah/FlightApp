@@ -28,18 +28,42 @@ struct FlightRouteCard: View {
                 )
             }
             
-            // Progress Bar
-            if flight.isInProgress {
-                customProgressBar
-            }
+            // Progress Bar and Status
+            flightProgressSection
             
             // Time Information
             HStack {
-                FlightTimeView(time: times.departure, isArrival: false)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Departure")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    FlightTimeView(time: times.departure, isArrival: false)
+                }
                 
                 Spacer()
                 
-                FlightTimeView(time: times.arrival, isArrival: true)
+                VStack(alignment: .trailing, spacing: 4) {
+                    Text("Arrival")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    FlightTimeView(time: times.arrival, isArrival: true)
+                }
+            }
+            
+            // Show date context only when departure and arrival are on different dates
+            if times.departure.relativeDate != times.arrival.relativeDate {
+                HStack {
+                    Text(times.departure.relativeDate)
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                    
+                    Spacer()
+                    
+                    Text(times.arrival.relativeDate)
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+                .padding(.top, 4)
             }
             
             // Flight Duration
@@ -53,28 +77,134 @@ struct FlightRouteCard: View {
         .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 2)
     }
     
-    // Custom progress bar
-    private var customProgressBar: some View {
-        GeometryReader { geometry in
-            ZStack(alignment: .leading) {
-                // Background track
-                Rectangle()
-                    .fill(Color.secondary.opacity(0.2))
-                    .frame(height: 2)
+    // Flight progress section with status
+    private var flightProgressSection: some View {
+        VStack(spacing: 8) {
+            if flight.isInProgress {
+                // Progress bar for in-flight
+                customProgressBar
                 
-                // Progress fill
-                Rectangle()
-                    .fill(.blue)
-                    .frame(width: progressWidth(in: geometry), height: 2)
-                
-                // Airplane icon
-                Image(systemName: "airplane")
-                    .foregroundStyle(.blue)
-                    .rotationEffect(.degrees(0))
-                    .offset(x: progressWidth(in: geometry) - 10)
+                // Arrival delay info for in-flight
+                if let arrivalDelay = flight.arrivalDelay, abs(arrivalDelay) > 300 {
+                    arrivalDelayView(delay: arrivalDelay)
+                }
+            } else if flight.actualOn != nil {
+                // Completed flight status
+                completedFlightStatus
+            } else {
+                // Pre-departure status
+                preDepartureStatus
             }
         }
-        .frame(height: 20)
+    }
+    
+    // Arrival delay view for in-flight
+    private func arrivalDelayView(delay: Int) -> some View {
+        let minutes = abs(delay) / 60
+        let isLate = delay > 0
+        
+        return HStack(spacing: 6) {
+            Image(systemName: isLate ? "clock.arrow.circlepath" : "speedometer")
+                .font(.caption)
+                .foregroundColor(isLate ? .orange : .green)
+            
+            Text(isLate ? "Arriving \(minutes)m late" : "Arriving \(minutes)m early")
+                .font(.caption)
+                .fontWeight(.medium)
+                .foregroundColor(isLate ? .orange : .green)
+            
+            Spacer()
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background((isLate ? Color.orange : Color.green).opacity(0.1))
+        .cornerRadius(6)
+    }
+    
+    // Completed flight status
+    private var completedFlightStatus: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "checkmark.circle.fill")
+                .font(.caption)
+                .foregroundColor(.green)
+            
+            Text("Flight Completed")
+                .font(.caption)
+                .fontWeight(.medium)
+                .foregroundColor(.green)
+            
+            Spacer()
+            
+            if let arrivalDelay = flight.arrivalDelay, abs(arrivalDelay) > 300 {
+                let minutes = abs(arrivalDelay) / 60
+                let isLate = arrivalDelay > 0
+                Text(isLate ? "\(minutes)m late" : "\(minutes)m early")
+                    .font(.caption)
+                    .foregroundColor(isLate ? .orange : .green)
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(Color.green.opacity(0.1))
+        .cornerRadius(6)
+    }
+    
+    // Pre-departure status
+    private var preDepartureStatus: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "clock")
+                .font(.caption)
+                .foregroundColor(.blue)
+            
+            Text("Scheduled for Departure")
+                .font(.caption)
+                .fontWeight(.medium)
+                .foregroundColor(.blue)
+            
+            Spacer()
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(Color.blue.opacity(0.1))
+        .cornerRadius(6)
+    }
+    
+    // Custom progress bar
+    private var customProgressBar: some View {
+        VStack(spacing: 4) {
+            // Progress percentage
+            HStack {
+                Text("\(flight.accurateProgressPercent)% of flight completed")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                Spacer()
+            }
+            
+            // Progress bar
+            GeometryReader { geometry in
+                ZStack(alignment: .leading) {
+                    // Background track
+                    Rectangle()
+                        .fill(Color.secondary.opacity(0.2))
+                        .frame(height: 4)
+                        .cornerRadius(2)
+                    
+                    // Progress fill
+                    Rectangle()
+                        .fill(.blue)
+                        .frame(width: progressWidth(in: geometry), height: 4)
+                        .cornerRadius(2)
+                    
+                    // Airplane icon
+                    Image(systemName: "airplane")
+                        .font(.caption)
+                        .foregroundStyle(.blue)
+                        .background(Circle().fill(.white).frame(width: 12, height: 12))
+                        .offset(x: max(0, progressWidth(in: geometry) - 6))
+                }
+            }
+            .frame(height: 16)
+        }
     }
     
     // Calculate progress width based on available geometry

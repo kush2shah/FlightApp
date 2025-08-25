@@ -1,0 +1,19 @@
+meta {
+  name: Get aircraft-s last known flight
+  type: http
+  seq: 8
+}
+
+get {
+  url: {{baseUrl}}/history/aircraft/:registration/last_flight
+  body: none
+  auth: none
+}
+
+params:path {
+  registration: 
+}
+
+headers {
+  x-apikey: {{apiKey}}
+}

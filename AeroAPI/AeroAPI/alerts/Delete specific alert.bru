@@ -1,0 +1,15 @@
+meta {
+  name: Delete specific alert
+  type: http
+  seq: 5
+}
+
+delete {
+  url: {{baseUrl}}/alerts/:id
+  body: none
+  auth: none
+}
+
+headers {
+  x-apikey: {{apiKey}}
+}

@@ -1,0 +1,19 @@
+meta {
+  name: Get static information about an airport
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/airports/:id
+  body: none
+  auth: none
+}
+
+params:path {
+  id: 
+}
+
+headers {
+  x-apikey: {{apiKey}}
+}

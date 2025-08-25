@@ -1,0 +1,15 @@
+meta {
+  name: Remove and disable default account-wide alert callback URL
+  type: http
+  seq: 8
+}
+
+delete {
+  url: {{baseUrl}}/alerts/endpoint
+  body: none
+  auth: none
+}
+
+headers {
+  x-apikey: {{apiKey}}
+}

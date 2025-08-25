@@ -1,0 +1,15 @@
+meta {
+  name: Get the canonical code of an operator for API usage-
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/operators/:id/canonical
+  body: none
+  auth: none
+}
+
+headers {
+  x-apikey: {{apiKey}}
+}

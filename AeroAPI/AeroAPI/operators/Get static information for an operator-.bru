@@ -1,0 +1,15 @@
+meta {
+  name: Get static information for an operator-
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/operators/:id
+  body: none
+  auth: none
+}
+
+headers {
+  x-apikey: {{apiKey}}
+}

@@ -1,0 +1,15 @@
+meta {
+  name: Check if a given ident is blocked
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/aircraft/:ident/blocked
+  body: none
+  auth: none
+}
+
+headers {
+  x-apikey: {{apiKey}}
+}

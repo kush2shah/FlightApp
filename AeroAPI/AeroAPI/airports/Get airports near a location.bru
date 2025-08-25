@@ -1,0 +1,24 @@
+meta {
+  name: Get airports near a location
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/airports/nearby
+  body: none
+  auth: none
+}
+
+params:query {
+  latitude: 
+  longitude: 
+  radius: 
+  ~only_iap: 
+  ~max_pages: 
+  ~cursor: 
+}
+
+headers {
+  x-apikey: {{apiKey}}
+}

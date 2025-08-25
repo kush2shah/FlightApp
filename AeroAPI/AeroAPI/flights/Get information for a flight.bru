@@ -1,0 +1,27 @@
+meta {
+  name: Get information for a flight
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/flights/:ident
+  body: none
+  auth: none
+}
+
+params:query {
+  ~ident_type: 
+  ~start: 
+  ~end: 
+  ~max_pages: 
+  ~cursor: 
+}
+
+params:path {
+  ident: 
+}
+
+headers {
+  x-apikey: {{apiKey}}
+}

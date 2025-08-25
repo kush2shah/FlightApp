@@ -1,0 +1,15 @@
+meta {
+  name: Get information about an aircraft type
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/aircraft/types/:type
+  body: none
+  auth: none
+}
+
+headers {
+  x-apikey: {{apiKey}}
+}

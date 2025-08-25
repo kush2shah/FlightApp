@@ -1,0 +1,21 @@
+meta {
+  name: Search for flights- responses include Foresight data
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/foresight/flights/search/advanced
+  body: none
+  auth: none
+}
+
+params:query {
+  ~query: 
+  ~max_pages: 
+  ~cursor: 
+}
+
+headers {
+  x-apikey: {{apiKey}}
+}

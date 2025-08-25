@@ -146,6 +146,56 @@ class AeroAPIService {
         }
     }
     
+    func getFlightRoute(_ faFlightId: String) async throws -> AeroRouteResponse {
+        // Construct URL for the route endpoint
+        guard let url = URL(string: "\(baseURL)/flights/\(faFlightId)/route") else {
+            throw AeroAPIError.invalidURL
+        }
+        
+        var request = URLRequest(url: url)
+        request.setValue(apiKey, forHTTPHeaderField: "x-apikey")
+        
+        print("🗺️ Fetching route for flight: \(faFlightId)")
+        
+        do {
+            let (data, urlResponse) = try await URLSession.shared.data(for: request)
+            
+            guard let httpResponse = urlResponse as? HTTPURLResponse else {
+                throw AeroAPIError.invalidResponse
+            }
+            
+            print("📡 Route Response Status Code: \(httpResponse.statusCode)")
+            
+            // Handle error responses
+            guard (200...299).contains(httpResponse.statusCode) else {
+                switch httpResponse.statusCode {
+                case 404:
+                    print("⚠️ No route available for this flight")
+                    // Return empty route response for flights without route data
+                    return AeroRouteResponse(routeDistance: nil, fixes: [])
+                case 429:
+                    throw AeroAPIError.rateLimitExceeded
+                default:
+                    throw AeroAPIError.serverError(httpResponse.statusCode)
+                }
+            }
+            
+            let decoder = JSONDecoder()
+            let routeResponse = try decoder.decode(AeroRouteResponse.self, from: data)
+            
+            print("🛣️ Successfully decoded route with \(routeResponse.fixes.count) fixes")
+            
+            return routeResponse
+        }
+        catch let error as AeroAPIError {
+            throw error
+        }
+        catch {
+            print("❌ Route decoding error: \(error)")
+            throw AeroAPIError.decodingError
+        }
+    }
+    
     // The search strategy methods remain the same
     private func createPreciseIdentSearch(_ flightNumber: String) -> URLComponents? {
         var urlComponents = URLComponents(string: "\(baseURL)/flights/\(flightNumber)")

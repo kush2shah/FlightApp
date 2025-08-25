@@ -1,0 +1,19 @@
+meta {
+  name: Get count of flights matching search parameters
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/flights/search/count
+  body: none
+  auth: none
+}
+
+params:query {
+  ~query: 
+}
+
+headers {
+  x-apikey: {{apiKey}}
+}
