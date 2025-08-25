@@ -234,8 +234,17 @@ class WaypointDatabaseService {
     
     /// Load waypoints from CSV file
     private func loadCSVWaypoints() {
+        // Try to load the comprehensive navigation database first
+        if let path = Bundle.main.path(forResource: "complete_navigation_database", ofType: "csv"),
+           let content = try? String(contentsOfFile: path) {
+            print("📍 Loading from comprehensive navigation database...")
+            parseCSVContent(content, source: "ARINC424")
+            return
+        }
+        
+        // Fallback to bundled international waypoints
         guard let path = Bundle.main.path(forResource: "international_waypoints", ofType: "csv") else {
-            print("⚠️ international_waypoints.csv not found in bundle")
+            print("⚠️ No waypoint database found in bundle")
             return
         }
         
@@ -244,6 +253,10 @@ class WaypointDatabaseService {
             return
         }
         
+        parseCSVContent(content, source: "bundled")
+    }
+    
+    private func parseCSVContent(_ content: String, source: String) {
         let lines = content.components(separatedBy: .newlines)
         var loadedCount = 0
         
@@ -252,15 +265,38 @@ class WaypointDatabaseService {
             guard !line.isEmpty else { continue }
             
             let components = line.components(separatedBy: ",")
-            guard components.count >= 6 else { continue }
             
-            let identifier = components[0].trimmingCharacters(in: .whitespaces)
-            guard let latitude = Double(components[1]),
-                  let longitude = Double(components[2]) else { continue }
+            // Handle different CSV formats
+            var identifier: String
+            var latitude: Double
+            var longitude: Double
+            var type: String
+            var usage: String
+            var region: String
             
-            let type = components[3].trimmingCharacters(in: .whitespaces)
-            let usage = components[4].trimmingCharacters(in: .whitespaces)
-            let region = components[5].trimmingCharacters(in: .whitespaces)
+            if source == "ARINC424" && components.count >= 7 {
+                // ARINC 424 format: identifier,latitude,longitude,type,nav_type,usage,region
+                identifier = components[0].trimmingCharacters(in: .whitespaces)
+                guard let lat = Double(components[1]),
+                      let lon = Double(components[2]) else { continue }
+                latitude = lat
+                longitude = lon
+                type = components[3].trimmingCharacters(in: .whitespaces)
+                usage = components[5].trimmingCharacters(in: .whitespaces)
+                region = components.count > 6 ? components[6].trimmingCharacters(in: .whitespaces) : ""
+            } else if components.count >= 6 {
+                // Bundled format: identifier,latitude,longitude,type,usage,region
+                identifier = components[0].trimmingCharacters(in: .whitespaces)
+                guard let lat = Double(components[1]),
+                      let lon = Double(components[2]) else { continue }
+                latitude = lat
+                longitude = lon
+                type = components[3].trimmingCharacters(in: .whitespaces)
+                usage = components[4].trimmingCharacters(in: .whitespaces)
+                region = components[5].trimmingCharacters(in: .whitespaces)
+            } else {
+                continue
+            }
             
             let waypoint = WaypointData(
                 identifier: identifier,
@@ -274,7 +310,7 @@ class WaypointDatabaseService {
             loadedCount += 1
         }
         
-        print("📍 Loaded \(loadedCount) waypoints from CSV database")
+        print("📍 Loaded \(loadedCount) waypoints from \(source) database")
     }
 }
 
@@ -282,43 +318,28 @@ class WaypointDatabaseService {
 
 extension WaypointDatabaseService {
     
-    /// Parse route using AeroAPI route data (preferred method)
+    /// Parse route using AeroAPI route data and comprehensive waypoint database
     func parseRouteFromAeroAPI(_ fixes: [RouteFix]) -> [CLLocationCoordinate2D] {
         var coordinates: [CLLocationCoordinate2D] = []
-        var lastCoordinate: CLLocationCoordinate2D?
         
+        // First, try using AeroAPI coordinates where available
         for fix in fixes {
-            guard let coordinate = fix.coordinate else { continue }
-            
-            // Validate coordinate ranges
-            guard abs(coordinate.latitude) <= 90.0 && abs(coordinate.longitude) <= 180.0 else {
-                print("⚠️ Invalid coordinate for \(fix.name): \(coordinate.latitude), \(coordinate.longitude)")
+            if let coordinate = fix.coordinate,
+               abs(coordinate.latitude) <= 90.0 && abs(coordinate.longitude) <= 180.0 {
+                coordinates.append(coordinate)
                 continue
             }
             
-            // Skip duplicate consecutive coordinates
-            if let last = lastCoordinate,
-               abs(last.latitude - coordinate.latitude) < 0.001 &&
-               abs(last.longitude - coordinate.longitude) < 0.001 {
-                continue
+            // If AeroAPI coordinate is missing/invalid, look up in our waypoint database
+            if let waypoint = getWaypoint(identifier: fix.name) {
+                coordinates.append(waypoint.coordinate)
+                print("📍 Resolved \(fix.name) from waypoint database: \(waypoint.coordinate)")
+            } else {
+                print("⚠️ Could not resolve waypoint: \(fix.name)")
             }
-            
-            // For international flights, filter out obviously incorrect waypoints
-            // by checking if the waypoint makes geographical sense relative to the previous one
-            if let last = lastCoordinate {
-                let distance = distanceBetween(last, coordinate)
-                // Skip waypoints that are unreasonably far (likely coordinate errors)
-                if distance > 2000 { // 2000km threshold for single waypoint jump
-                    print("⚠️ Skipping waypoint \(fix.name) - too far from previous: \(Int(distance))km")
-                    continue
-                }
-            }
-            
-            coordinates.append(coordinate)
-            lastCoordinate = coordinate
         }
         
-        print("🗺️ Parsed \(coordinates.count) valid waypoints from \(fixes.count) AeroAPI fixes")
+        print("🗺️ Parsed \(coordinates.count) waypoints from \(fixes.count) AeroAPI fixes")
         return coordinates
     }
     
@@ -327,6 +348,27 @@ extension WaypointDatabaseService {
         let location1 = CLLocation(latitude: coord1.latitude, longitude: coord1.longitude)
         let location2 = CLLocation(latitude: coord2.latitude, longitude: coord2.longitude)
         return location1.distance(from: location2) / 1000.0 // Convert to km
+    }
+    
+    /// Determine if a segment is likely transoceanic (crossing major water bodies)
+    private func isTransoceanicSegment(from start: CLLocationCoordinate2D, to end: CLLocationCoordinate2D) -> Bool {
+        // Atlantic crossing (Americas to Europe/Africa)
+        if (start.longitude < -30 && end.longitude > -10) || (start.longitude > -10 && end.longitude < -30) {
+            return true
+        }
+        
+        // Pacific crossing (Americas to Asia/Oceania)
+        if (start.longitude < -100 && end.longitude > 100) || (start.longitude > 100 && end.longitude < -100) {
+            return true
+        }
+        
+        // Large longitude difference indicates potential ocean crossing
+        let longitudeDiff = abs(start.longitude - end.longitude)
+        if longitudeDiff > 60 { // More than 60 degrees longitude difference
+            return true
+        }
+        
+        return false
     }
     
     /// Fallback: Parse a complete aviation route string using the waypoint database
