@@ -23,6 +23,16 @@ struct PopularRoute: Identifiable, Hashable {
 }
 
 struct PopularRouteStore {
+    static let featuredRoute = PopularRoute(
+        flightNumber: "AA1",
+        origin: "New York",
+        destination: "Los Angeles",
+        originCode: "JFK",
+        destinationCode: "LAX",
+        originFlag: "🇺🇸",
+        destinationFlag: "🇺🇸"
+    )
+    
     static let routes: [PopularRoute] = [
         PopularRoute(
             flightNumber: "SQ23",

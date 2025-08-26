@@ -33,7 +33,7 @@ struct FlightSearchView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 20) {
+                VStack(spacing: 24) {
                     // Search Bar
                     searchBarSection
                     
@@ -41,6 +41,9 @@ struct FlightSearchView: View {
                         ProgressView("Searching...")
                             .padding()
                     } else {
+                        // Hero Section - Featured Flight
+                        featuredFlightSection
+                        
                         // Recent Searches
                         if !recentSearchStore.recentSearches.isEmpty {
                             recentSearchesSection
@@ -53,6 +56,7 @@ struct FlightSearchView: View {
                 .padding()
             }
             .navigationTitle("Track Flight")
+            .background(Color(.systemGroupedBackground))
             .sheet(isPresented: $showFlightSelectionSheet) {
                 FlightSelectionSheet(
                     flights: availableFlights,
@@ -81,6 +85,7 @@ struct FlightSearchView: View {
         HStack {
             Image(systemName: "magnifyingglass")
                 .foregroundColor(.secondary)
+                .font(.system(size: 18, weight: .medium))
             
             TextField("Enter flight number", text: $searchText)
                 .font(.sfRounded(size: 17))
@@ -92,70 +97,194 @@ struct FlightSearchView: View {
             
             if isSearching {
                 ProgressView()
+                    .scaleEffect(0.9)
                     .padding(.leading, 4)
             }
         }
-        .padding()
-        .background(Color.secondary.opacity(0.1))
-        .cornerRadius(12)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+        .background(Color(.systemBackground))
+        .cornerRadius(16)
+        .shadow(color: Color.black.opacity(0.08), radius: 8, x: 0, y: 2)
+    }
+    
+    private var featuredFlightSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Text("Featured Flight")
+                    .font(.sfRounded(size: 20, weight: .semibold))
+                    .foregroundColor(.primary)
+                Spacer()
+                Text("Live")
+                    .font(.sfRounded(size: 12, weight: .medium))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color.red)
+                    .foregroundColor(.white)
+                    .cornerRadius(6)
+            }
+            
+            Button(action: {
+                selectRoute(PopularRouteStore.featuredRoute)
+            }) {
+                HStack(spacing: 16) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack {
+                            Text(PopularRouteStore.featuredRoute.originFlag)
+                                .font(.title2)
+                            Text(PopularRouteStore.featuredRoute.originCode)
+                                .font(.sfRounded(size: 16, weight: .medium))
+                                .foregroundColor(.primary)
+                        }
+                        Text(PopularRouteStore.featuredRoute.origin)
+                            .font(.sfRounded(size: 12))
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    Spacer()
+                    
+                    VStack(spacing: 8) {
+                        Image(systemName: "airplane")
+                            .font(.system(size: 20, weight: .medium))
+                            .foregroundColor(.blue)
+                        
+                        Text(PopularRouteStore.featuredRoute.flightNumber)
+                            .font(.sfRounded(size: 14, weight: .bold))
+                            .foregroundColor(.blue)
+                    }
+                    
+                    Spacer()
+                    
+                    VStack(alignment: .trailing, spacing: 4) {
+                        HStack {
+                            Text(PopularRouteStore.featuredRoute.destinationCode)
+                                .font(.sfRounded(size: 16, weight: .medium))
+                                .foregroundColor(.primary)
+                            Text(PopularRouteStore.featuredRoute.destinationFlag)
+                                .font(.title2)
+                        }
+                        Text(PopularRouteStore.featuredRoute.destination)
+                            .font(.sfRounded(size: 12))
+                            .foregroundColor(.secondary)
+                    }
+                }
+                .padding(20)
+                .background(
+                    LinearGradient(
+                        colors: [Color.blue.opacity(0.1), Color.blue.opacity(0.05)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .cornerRadius(20)
+                .shadow(color: Color.black.opacity(0.08), radius: 12, x: 0, y: 4)
+            }
+            .buttonStyle(PlainButtonStyle())
+        }
     }
     
     private var recentSearchesSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 12) {
             Text("Recent Searches")
-                .font(.sfRounded(size: 17, weight: .semibold))
+                .font(.sfRounded(size: 18, weight: .semibold))
+                .foregroundColor(.primary)
             
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 10) {
+                HStack(spacing: 12) {
                     ForEach(recentSearchStore.recentSearches) { search in
                         Button(action: {
                             selectRecentSearch(search)
                         }) {
                             Text(search.route)
-                                .font(.sfRounded(size: 15))
-                                .padding(8)
+                                .font(.sfRounded(size: 14, weight: .medium))
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 8)
                                 .background(Color.blue.opacity(0.1))
-                                .cornerRadius(8)
+                                .cornerRadius(12)
                                 .foregroundColor(.blue)
                         }
                     }
                 }
+                .padding(.horizontal, 2)
             }
         }
     }
     
     private var popularRoutesSection: some View {
-        VStack(alignment: .leading, spacing: 15) {
-            Text("Popular Routes")
-                .font(.headline)
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Text("Popular Routes")
+                    .font(.sfRounded(size: 20, weight: .semibold))
+                    .foregroundColor(.primary)
+                Spacer()
+                Text("\(searchResults.count) routes")
+                    .font(.sfRounded(size: 14))
+                    .foregroundColor(.secondary)
+            }
             
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 15) {
+            LazyVGrid(
+                columns: [
+                    GridItem(.flexible(), spacing: 12),
+                    GridItem(.flexible(), spacing: 12)
+                ],
+                spacing: 16
+            ) {
                 ForEach(searchResults) { route in
                     Button(action: {
                         selectRoute(route)
                     }) {
-                        VStack(spacing: 8) {
-                            HStack(spacing: 8) {
-                                Text(route.originFlag)
-                                Text(route.originCode)
-                                    .font(.caption)
+                        VStack(spacing: 12) {
+                            // Route Header
+                            HStack {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    HStack(spacing: 4) {
+                                        Text(route.originFlag)
+                                            .font(.title3)
+                                        Text(route.originCode)
+                                            .font(.sfRounded(size: 13, weight: .semibold))
+                                            .foregroundColor(.primary)
+                                    }
+                                }
                                 
-                                Image(systemName: "arrow.right")
-                                    .foregroundColor(.secondary)
+                                Spacer()
                                 
-                                Text(route.destinationFlag)
-                                Text(route.destinationCode)
-                                    .font(.caption)
+                                Image(systemName: "airplane")
+                                    .font(.system(size: 14, weight: .medium))
+                                    .foregroundColor(.blue)
+                                    .rotationEffect(.degrees(-45))
+                                
+                                Spacer()
+                                
+                                VStack(alignment: .trailing, spacing: 2) {
+                                    HStack(spacing: 4) {
+                                        Text(route.destinationCode)
+                                            .font(.sfRounded(size: 13, weight: .semibold))
+                                            .foregroundColor(.primary)
+                                        Text(route.destinationFlag)
+                                            .font(.title3)
+                                    }
+                                }
                             }
                             
-                            Text(route.flightNumber)
-                                .font(.headline)
-                                .foregroundColor(.blue)
+                            // Flight Number
+                            HStack {
+                                Text(route.flightNumber)
+                                    .font(.sfRounded(size: 16, weight: .bold))
+                                    .foregroundColor(.blue)
+                                
+                                Spacer()
+                                
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 12, weight: .medium))
+                                    .foregroundColor(.secondary)
+                            }
                         }
-                        .padding()
-                        .background(Color.secondary.opacity(0.1))
-                        .cornerRadius(12)
+                        .padding(16)
+                        .background(Color(.systemBackground))
+                        .cornerRadius(16)
+                        .shadow(color: Color.black.opacity(0.06), radius: 8, x: 0, y: 2)
                     }
+                    .buttonStyle(PlainButtonStyle())
                 }
             }
         }

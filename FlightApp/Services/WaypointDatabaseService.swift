@@ -538,14 +538,33 @@ extension WaypointDatabaseService {
                 return nil 
             }
             
-            let latitude = (latNumbers.count == 4 ? latValue / 100.0 : latValue) * (latDir == "N" ? 1 : -1)
-            let longitude = (lonNumbers.count >= 4 ? lonValue / 100.0 : lonValue) * (lonDir == "E" ? 1 : -1)
+            // Parse DDMM format coordinates properly
+            let latitude: Double
+            let longitude: Double
+            
+            if latNumbers.count == 4 {
+                // DDMM format: extract degrees and minutes
+                let latDegrees = floor(latValue / 100.0)
+                let latMinutes = latValue - (latDegrees * 100.0)
+                latitude = (latDegrees + latMinutes / 60.0) * (latDir == "N" ? 1 : -1)
+            } else {
+                latitude = latValue * (latDir == "N" ? 1 : -1)
+            }
+            
+            if lonNumbers.count >= 4 {
+                // DDMM or DDDMM format: extract degrees and minutes
+                let lonDegrees = floor(lonValue / 100.0)
+                let lonMinutes = lonValue - (lonDegrees * 100.0)
+                longitude = (lonDegrees + lonMinutes / 60.0) * (lonDir == "E" ? 1 : -1)
+            } else {
+                longitude = lonValue * (lonDir == "E" ? 1 : -1)
+            }
             
             print("📍 Successfully parsed \(string) → lat: \(latitude), lon: \(longitude)")
             return CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
         }
         
-        // Handle format like "28S142E"
+        // Handle format like "28S142E" or "0649N08043E"
         let regex = try? NSRegularExpression(pattern: #"(\d+)([NS])(\d+)([EW])"#, options: [])
         let nsRange = NSRange(string.startIndex..<string.endIndex, in: string)
         
@@ -555,15 +574,38 @@ extension WaypointDatabaseService {
             let lonRange = Range(match.range(at: 3), in: string)!
             let lonDirRange = Range(match.range(at: 4), in: string)!
             
-            guard let latValue = Double(String(string[latRange])),
-                  let lonValue = Double(String(string[lonRange])) else { return nil }
+            let latNumbers = String(string[latRange])
+            let lonNumbers = String(string[lonRange])
+            
+            guard let latValue = Double(latNumbers),
+                  let lonValue = Double(lonNumbers) else { return nil }
             
             let latDir = String(string[latDirRange])
             let lonDir = String(string[lonDirRange])
             
-            let latitude = latValue * (latDir == "N" ? 1 : -1)
-            let longitude = lonValue * (lonDir == "E" ? 1 : -1)
+            // Parse DDMM format coordinates properly
+            let latitude: Double
+            let longitude: Double
             
+            if latNumbers.count == 4 {
+                // DDMM format: extract degrees and minutes
+                let latDegrees = floor(latValue / 100.0)
+                let latMinutes = latValue - (latDegrees * 100.0)
+                latitude = (latDegrees + latMinutes / 60.0) * (latDir == "N" ? 1 : -1)
+            } else {
+                latitude = latValue * (latDir == "N" ? 1 : -1)
+            }
+            
+            if lonNumbers.count >= 4 {
+                // DDMM or DDDMM format: extract degrees and minutes
+                let lonDegrees = floor(lonValue / 100.0)
+                let lonMinutes = lonValue - (lonDegrees * 100.0)
+                longitude = (lonDegrees + lonMinutes / 60.0) * (lonDir == "E" ? 1 : -1)
+            } else {
+                longitude = lonValue * (lonDir == "E" ? 1 : -1)
+            }
+            
+            print("📍 Successfully parsed \(string) → lat: \(latitude), lon: \(longitude)")
             return CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
         }
         
