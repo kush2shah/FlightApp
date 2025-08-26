@@ -32,31 +32,68 @@ struct FlightSearchView: View {
     
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(spacing: 24) {
-                    // Search Bar
-                    searchBarSection
+            GeometryReader { geometry in
+                VStack {
+                    Spacer()
                     
-                    if isSearching {
-                        ProgressView("Searching...")
-                            .padding()
-                    } else {
-                        // Hero Section - Featured Flight
-                        featuredFlightSection
+                    // Hero Search Bar - Centered
+                    VStack(spacing: 32) {
+                        heroSearchBarSection
                         
-                        // Recent Searches
-                        if !recentSearchStore.recentSearches.isEmpty {
-                            recentSearchesSection
+                        if isSearching {
+                            ProgressView("Searching...")
+                                .font(.sfRounded(size: 16))
+                                .foregroundColor(.secondary)
+                        } else {
+                            // Recent Searches (if any)
+                            if !recentSearchStore.recentSearches.isEmpty {
+                                recentSearchesSection
+                            }
+                            
+                            // Search hints
+                            searchHintsSection
                         }
-                        
-                        // Popular Routes
-                        popularRoutesSection
                     }
+                    .padding(.horizontal, 24)
+                    
+                    Spacer()
+                    Spacer() // Extra spacer to push content up slightly
                 }
-                .padding()
             }
             .navigationTitle("Track Flight")
-            .background(Color(.systemGroupedBackground))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Menu {
+                        ForEach(PopularRouteStore.routes.prefix(6)) { route in
+                            Button(action: {
+                                selectRoute(route)
+                            }) {
+                                Label(route.routeDisplayName, systemImage: "airplane")
+                            }
+                        }
+                        
+                        Divider()
+                        
+                        Button(action: {
+                            // Could expand to show all routes in future
+                        }) {
+                            Label("Browse All Routes", systemImage: "list.bullet")
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
+                            .font(.system(size: 18))
+                            .foregroundColor(.secondary)
+                    }
+                }
+            }
+            .background(
+                LinearGradient(
+                    colors: [Color(.systemBackground), Color(.systemGroupedBackground)],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            )
             .sheet(isPresented: $showFlightSelectionSheet) {
                 FlightSelectionSheet(
                     flights: availableFlights,
@@ -78,6 +115,98 @@ struct FlightSearchView: View {
             }, message: {
                 Text(searchError ?? "An unknown error occurred")
             })
+        }
+    }
+    
+    private var heroSearchBarSection: some View {
+        VStack(spacing: 16) {
+            // App title/tagline
+            Text("Track Any Flight")
+                .font(.sfRounded(size: 32, weight: .bold))
+                .foregroundColor(.primary)
+                .multilineTextAlignment(.center)
+            
+            Text("Enter flight number, route, or airline")
+                .font(.sfRounded(size: 16))
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+            
+            // Large hero search bar
+            heroSearchField
+        }
+    }
+    
+    private var heroSearchField: some View {
+        HStack(spacing: 16) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 22, weight: .medium))
+                .foregroundColor(.secondary)
+            
+            TextField("AA1, LAX to JFK, United...", text: $searchText)
+                .font(.sfRounded(size: 20))
+                .textInputAutocapitalization(.characters)
+                .autocorrectionDisabled()
+                .focused($isSearchFocused)
+                .onSubmit(searchFlight)
+                .disabled(isSearching)
+            
+            if isSearching {
+                ProgressView()
+                    .scaleEffect(1.2)
+            } else if !searchText.isEmpty {
+                Button(action: {
+                    searchText = ""
+                }) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 20))
+                        .foregroundColor(.secondary)
+                }
+            }
+        }
+        .padding(.horizontal, 24)
+        .padding(.vertical, 20)
+        .background(Color(.systemBackground))
+        .cornerRadius(20)
+        .shadow(color: Color.black.opacity(0.1), radius: 16, x: 0, y: 4)
+        .overlay(
+            RoundedRectangle(cornerRadius: 20)
+                .stroke(isSearchFocused ? Color.blue.opacity(0.3) : Color.clear, lineWidth: 2)
+        )
+        .scaleEffect(isSearchFocused ? 1.02 : 1.0)
+        .animation(.easeInOut(duration: 0.2), value: isSearchFocused)
+    }
+    
+    private var searchHintsSection: some View {
+        VStack(spacing: 12) {
+            HStack(spacing: 20) {
+                searchHintButton("AA1", icon: "airplane")
+                searchHintButton("LAX", icon: "building.2")
+                searchHintButton("United", icon: "globe")
+            }
+            
+            Text("Try searching flight numbers, airports, or airlines")
+                .font(.sfRounded(size: 14))
+                .foregroundColor(.tertiary)
+                .multilineTextAlignment(.center)
+        }
+    }
+    
+    private func searchHintButton(_ text: String, icon: String) -> some View {
+        Button(action: {
+            searchText = text
+            searchFlight()
+        }) {
+            HStack(spacing: 8) {
+                Image(systemName: icon)
+                    .font(.system(size: 14, weight: .medium))
+                Text(text)
+                    .font(.sfRounded(size: 15, weight: .medium))
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .background(Color.blue.opacity(0.1))
+            .foregroundColor(.blue)
+            .cornerRadius(12)
         }
     }
     
@@ -184,28 +313,32 @@ struct FlightSearchView: View {
     }
     
     private var recentSearchesSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Recent Searches")
-                .font(.sfRounded(size: 18, weight: .semibold))
-                .foregroundColor(.primary)
+        VStack(spacing: 12) {
+            Text("Recent")
+                .font(.sfRounded(size: 16, weight: .medium))
+                .foregroundColor(.secondary)
             
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 12) {
-                    ForEach(recentSearchStore.recentSearches) { search in
+                    ForEach(recentSearchStore.recentSearches.prefix(4)) { search in
                         Button(action: {
                             selectRecentSearch(search)
                         }) {
-                            Text(search.route)
-                                .font(.sfRounded(size: 14, weight: .medium))
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 8)
-                                .background(Color.blue.opacity(0.1))
-                                .cornerRadius(12)
-                                .foregroundColor(.blue)
+                            HStack(spacing: 6) {
+                                Image(systemName: "clock")
+                                    .font(.system(size: 12))
+                                Text(search.route)
+                                    .font(.sfRounded(size: 14, weight: .medium))
+                            }
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(Color(.secondarySystemBackground))
+                            .foregroundColor(.primary)
+                            .cornerRadius(10)
                         }
                     }
                 }
-                .padding(.horizontal, 2)
+                .padding(.horizontal, 1)
             }
         }
     }
