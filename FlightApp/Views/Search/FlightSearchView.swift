@@ -186,7 +186,7 @@ struct FlightSearchView: View {
             
             Text("Try searching flight numbers, airports, or airlines")
                 .font(.sfRounded(size: 14))
-                .foregroundColor(.tertiary)
+                .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
         }
     }
