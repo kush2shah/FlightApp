@@ -126,7 +126,7 @@ struct FlightSearchView: View {
                 .foregroundColor(.primary)
                 .multilineTextAlignment(.center)
             
-            Text("Enter flight number, route, or airline")
+            Text("Enter any flight number")
                 .font(.sfRounded(size: 16))
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
@@ -142,7 +142,7 @@ struct FlightSearchView: View {
                 .font(.system(size: 22, weight: .medium))
                 .foregroundColor(.secondary)
             
-            TextField("AA1, LAX to JFK, United...", text: $searchText)
+            TextField("AA1, UA60, BA175...", text: $searchText)
                 .font(.sfRounded(size: 20))
                 .textInputAutocapitalization(.characters)
                 .autocorrectionDisabled()
@@ -180,11 +180,11 @@ struct FlightSearchView: View {
         VStack(spacing: 12) {
             HStack(spacing: 20) {
                 searchHintButton("AA1", icon: "airplane")
-                searchHintButton("LAX", icon: "building.2")
-                searchHintButton("United", icon: "globe")
+                searchHintButton("UA60", icon: "airplane")
+                searchHintButton("BA175", icon: "airplane")
             }
             
-            Text("Try searching flight numbers, airports, or airlines")
+            Text("Try searching any flight number")
                 .font(.sfRounded(size: 14))
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
