@@ -30,17 +30,137 @@ This project serves multiple learning goals:
 - **Architecture**: MVVM pattern with async/await
 - **Development**: Claude was used as a peer in building this
 
-## Current Status
+## Development History & Current Status
 
-**Version 0.1.0** (Release Candidate)
+### Enhanced Home Screen & Search Experience (Current Branch: `map-centric-search`)
 
-✅ Core flight tracking functionality  
-✅ Route visualization with waypoint mapping  
-✅ Enhanced UI with status indicators  
-✅ Comprehensive navigation database  
-⚠️ International route mapping (limited coverage in some regions)
+**Goal**: Transform the app into a search-centric experience where the search bar is the hero element, making flight discovery addictive and engaging.
 
-*This represents the current state of the project. Future updates and maintenance will depend on available time and evolving interests.*
+#### ✅ Completed Work
+
+1. **Hero Search Bar Implementation**
+   - Redesigned FlightSearchView with centered, prominent search bar
+   - Added large typography ("Track Any Flight" title)
+   - Implemented focus animations and visual feedback
+   - Added clear button and enhanced search field styling
+
+2. **UI/UX Improvements**
+   - Moved popular routes to subtle overflow menu with SF Symbols
+   - Clean gradient background design
+   - Reduced visual clutter to focus on search
+   - Added search hint buttons (AA1, UA60, BA175)
+
+3. **Critical Bug Fixes**
+   - **Oceanic coordinate parsing**: Fixed DDMM format parsing crash
+     - `0649N08043E` now correctly parsed as `6.816°N, 80.716°E`
+     - Prevents MapKit "Invalid Region" crashes
+   - **Flight date filtering**: Fixed random historical dates issue
+     - Added `start` parameter to AeroAPI calls for current/upcoming flights only
+   - **Search messaging**: Updated UI to reflect actual capabilities (flight numbers only)
+
+#### 🔄 Current Status
+
+**Branch**: `map-centric-search`  
+**Last Commit**: `828c8fb` - Fix flight date filtering  
+
+**What Works**:
+- Hero search bar with animations and focus states
+- Popular routes accessible via overflow menu (ellipsis icon)
+- Coordinate parsing fixed (no more app crashes)
+- Date filtering shows relevant flights only
+- Enhanced visual design with gradients and shadows
+
+#### 📋 Next Steps (Pending Implementation)
+
+1. **Enhanced Search Experience**
+   - Real-time search suggestions as user types
+   - Search history integration with better UX
+   - Haptic feedback on search interactions
+
+2. **Advanced Search Animations**
+   - Smooth focus/unfocus transitions  
+   - Premium loading state animations
+   - Enhanced visual feedback systems
+
+3. **Map Background Integration** (Future Vision)
+   - Replace current background with interactive world map
+   - Floating search bar overlay on map
+   - Search → map zoom → route trace → detail overlay flow
+   - "Commanding a global view" user experience
+
+### Previous Major Development
+
+#### International Route Tracking System (`enhanced-route-mapping` branch)
+- Comprehensive ARINC 424 waypoint database (31,774+ waypoints)
+- Complex oceanic coordinate parsing for international flights
+- Advanced route string parsing for multi-waypoint paths
+- Enhanced MapKit integration with custom annotations
+
+#### Navigation Database Integration
+- CSV-based waypoint loading with fallback mechanisms
+- Support for VOR, DME, NDB navigation aids
+- Geographic coordinate validation and error handling
+- Real-time waypoint resolution for flight routes
+
+## Technical Architecture
+
+### Key Services
+- **AeroAPIService**: Flight data fetching with proper date filtering
+- **WaypointDatabaseService**: International waypoint resolution with coordinate fixes
+- **PopularRouteStore**: Sample flight management with featured routes
+
+### Enhanced Data Models  
+- **AeroFlight**: FlightAware API response with null-safety
+- **FlightTime**: Advanced time/date formatting with timezone support
+- **WaypointData**: Comprehensive navigation database entries
+
+### Current UI Focus
+- **FlightSearchView**: Hero search experience (heavily redesigned)
+- **FlightView**: Detailed flight information with route mapping
+- **FlightRouteMapKitView**: Enhanced route visualization
+
+## Search-First Design Philosophy
+
+The current development direction focuses on making search the primary, addictive interaction:
+- Large, centered search bar as the hero element
+- Minimal visual distractions to maintain focus
+- Quick access to sample flights without visual competition
+- Smooth animations that encourage repeated engagement
+
+### Future Vision: Map-Centric Experience
+Planned evolution toward a unique map-integrated experience:
+1. World map as primary background
+2. Floating search interface over interactive map
+3. Seamless search → map zoom → route trace → detail overlay
+4. Users feel like they're "commanding a global view" of aviation
+
+## Development Setup
+
+### Testing Flights (Verified Working)
+- **AA1** (JFK-LAX) - Featured domestic route
+- **UA60** (SFO-MEL) - Long-haul international
+- **BA175** (LHR-JFK) - Reliable transatlantic service
+
+### Key Modified Files
+- `FlightSearchView.swift` - Complete hero search redesign
+- `AeroAPIService.swift` - Enhanced with proper date filtering  
+- `WaypointDatabaseService.swift` - Critical coordinate parsing fixes applied
+- `PopularRouteStore.swift` - Sample flights with featured route system
+
+## Known Limitations & Next Session Goals
+
+**Current Limitations**:
+- Search supports flight numbers only (airports/airlines not implemented)
+- Map background integration pending
+- Real-time search suggestions not yet added
+
+**When Resuming Development**:
+1. Continue with pending todos for enhanced search experience
+2. Begin map background integration work
+3. Implement search-to-map transition animations
+4. Add real-time search suggestions and autocomplete
+
+The foundation for a search-centric, map-integrated flight tracking experience is now solidly in place, with critical bugs resolved and a clear path forward.
 
 ## Development Philosophy
 
