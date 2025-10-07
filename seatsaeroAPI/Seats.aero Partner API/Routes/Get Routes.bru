@@ -1,0 +1,19 @@
+meta {
+  name: Get Routes
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/routes
+  body: none
+  auth: none
+}
+
+params:query {
+  source: 
+}
+
+headers {
+  Partner-Authorization: {{apiKey}}
+}

@@ -1,0 +1,1121 @@
+openapi: 3.0.3
+info:
+  title: Seats.aero Partner API
+  description: |
+    The Seats.aero Partner API provides unmatched levels of access to award travel data.
+    Query redemption availability across all major airline alliances, get instant pricing
+    and availability for over 70,000 routes, and perform live searches on any route across
+    20+ different mileage programs.
+
+    ## Authorization
+    All requests require an API key in the `Partner-Authorization` header.
+
+    ## Rate Limits
+    - Pro users: 1,000 API calls per day (non-commercial use)
+    - Commercial users: Custom limits by agreement
+
+    ## Content Types
+    All requests and responses use JSON format.
+  version: 1.0.0
+  contact:
+    email: [email protected]
+  termsOfService: https://seats.aero/terms
+
+servers:
+  - url: https://seats.aero/partnerapi
+    description: Production API server
+
+security:
+  - PartnerAuthorization: []
+
+tags:
+  - name: Search
+    description: Search for award availability
+  - name: Availability
+    description: Retrieve availability information
+  - name: Trips
+    description: Get detailed flight-level information
+  - name: Routes
+    description: Route information
+
+paths:
+  /search:
+    get:
+      summary: Cached Search
+      description: |
+        Search for availability between specific airports within specific date ranges
+        across all mileage programs. This is the most common endpoint for searching
+        cached availability data. Use this when you have specific airports and dates in mind.
+
+        Results are ordered by departure date and available cabins by default, with premium
+        cabins ranked higher. Use order_by=lowest_mileage to sort by cheapest prices first.
+      operationId: cachedSearch
+      tags:
+        - Search
+      parameters:
+        - name: origin_airport
+          in: query
+          description: Origin airport code(s). Comma-delimited if multiple (e.g., "SFO,LAX")
+          required: true
+          schema:
+            type: string
+          example: "JFK"
+        - name: destination_airport
+          in: query
+          description: Destination airport code(s). Comma-delimited if multiple (e.g., "FRA,LHR")
+          required: true
+          schema:
+            type: string
+          example: "LHR"
+        - name: start_date
+          in: query
+          description: Results must depart on or after this date (YYYY-MM-DD format)
+          schema:
+            type: string
+            format: date
+          example: "2025-10-20"
+        - name: end_date
+          in: query
+          description: Results must depart on or before this date (YYYY-MM-DD format)
+          schema:
+            type: string
+            format: date
+          example: "2025-10-22"
+        - name: sources
+          in: query
+          description: Mileage program(s) to filter by. Comma-delimited if multiple (e.g., "aeroplan,united")
+          schema:
+            type: string
+          example: "american,alaska"
+        - name: cabins
+          in: query
+          description: |
+            Required cabin availability. Comma-delimited if multiple (e.g., "economy,business").
+            Valid values: economy, premium_economy, business, first
+          schema:
+            type: string
+          example: "business"
+        - name: carriers
+          in: query
+          description: Only return results with these carriers. Comma-delimited airline codes (e.g., "DL,AA"). Respects cabin parameter if provided.
+          schema:
+            type: string
+          example: "AA,BA"
+        - name: only_direct_flights
+          in: query
+          description: Only return results with direct flights available. Respects cabin parameter if provided.
+          schema:
+            type: boolean
+            default: false
+        - name: take
+          in: query
+          description: Maximum number of results to return. Must be between 10 and 1000.
+          schema:
+            type: integer
+            minimum: 10
+            maximum: 1000
+            default: 500
+        - name: skip
+          in: query
+          description: Number of results to skip for pagination
+          schema:
+            type: integer
+            default: 0
+        - name: cursor
+          in: query
+          description: Cursor obtained from a previous search call for consistent pagination
+          schema:
+            type: integer
+        - name: order_by
+          in: query
+          description: |
+            Sort order for results. Default orders by departure date then available cabins
+            (premium cabins ranked higher). Use "lowest_mileage" to sort by cheapest prices first.
+          schema:
+            type: string
+            enum: [default, lowest_mileage]
+        - name: include_trips
+          in: query
+          description: Include trip-level details in response. May degrade performance and increase response size.
+          schema:
+            type: boolean
+            default: false
+        - name: minify_trips
+          in: query
+          description: When include_trips is enabled, returns reduced fields per trip to improve performance
+          schema:
+            type: boolean
+            default: false
+        - name: include_filtered
+          in: query
+          description: Return results that only have raw (filtered) results. Enable when using raw fields to prevent dynamic price filtering.
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: Successful response with availability results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchResponse'
+              example:
+                data:
+                  - ID: "2pFyV1PuOIyaYWDgOoNHpJtf6x5"
+                    RouteID: "2HmZ2Xah52QzyddIB7JAM28jKqs"
+                    Date: "2025-10-20"
+                    Source: "american"
+                    YAvailable: true
+                    JAvailable: true
+                    JMileageCost: "57500"
+                    JRemainingSeats: 3
+                count: 29
+                hasMore: false
+                cursor: 1759808192
+        '400':
+          description: Bad request - Invalid parameters
+        '401':
+          description: Unauthorized - Invalid or missing API key
+        '429':
+          description: Rate limit exceeded
+
+  /availability:
+    get:
+      summary: Bulk Availability
+      description: |
+        Retrieve a large amount of availability objects from one specific mileage program.
+        Use this endpoint for broad availability searches across regions. Similar to the
+        Explore feature on Seats.aero.
+
+        If you have specific airports and dates in mind, use Cached Search instead.
+      operationId: bulkAvailability
+      tags:
+        - Availability
+      parameters:
+        - name: source
+          in: query
+          description: The mileage program to retrieve availability from (required, single source only)
+          required: true
+          schema:
+            type: string
+            enum:
+              - aeroplan
+              - alaska
+              - american
+              - united
+              - delta
+              - jetblue
+              - virginatlantic
+              - flyingblue
+              - lifemiles
+              - avianca
+              - etihad
+              - emirates
+              - qantas
+              - velocity
+              - singapore
+              - turkish
+              - qatar
+              - connectmiles
+              - azul
+              - smiles
+              - eurobonus
+              - aeromexico
+              - ethiopian
+              - saudia
+              - finnair
+          example: "aeroplan"
+        - name: cabin
+          in: query
+          description: |
+            Only returns results with this cabin available.
+            Valid values: economy, premium, business, first
+          schema:
+            type: string
+            enum: [economy, premium, business, first]
+          example: "business"
+        - name: start_date
+          in: query
+          description: Only returns results departing on or after this date (YYYY-MM-DD)
+          schema:
+            type: string
+            format: date
+          example: "2025-10-25"
+        - name: end_date
+          in: query
+          description: Only returns results departing on or before this date (YYYY-MM-DD)
+          schema:
+            type: string
+            format: date
+          example: "2025-10-25"
+        - name: origin_region
+          in: query
+          description: Only returns results originating in this region
+          schema:
+            type: string
+            enum:
+              - North America
+              - South America
+              - Africa
+              - Asia
+              - Europe
+              - Oceania
+          example: "North America"
+        - name: destination_region
+          in: query
+          description: Only returns results arriving in this region
+          schema:
+            type: string
+            enum:
+              - North America
+              - South America
+              - Africa
+              - Asia
+              - Europe
+              - Oceania
+          example: "North America"
+        - name: take
+          in: query
+          description: How many results to return. Must be between 10 and 1000.
+          schema:
+            type: integer
+            minimum: 10
+            maximum: 1000
+            default: 500
+        - name: skip
+          in: query
+          description: How many results to skip for pagination
+          schema:
+            type: integer
+            default: 0
+        - name: cursor
+          in: query
+          description: Cursor obtained from a previous availability response for consistent pagination
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Successful response with availability results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AvailabilityResponse'
+              example:
+                data:
+                  - ID: "2oijELXRNyITKBrTYxar007KjFz"
+                    RouteID: "2VHiUXpG3myndlCpMDzH8YaoFCk"
+                    Date: "2025-10-25"
+                    Source: "aeroplan"
+                    YAvailable: true
+                    JAvailable: true
+                    JMileageCost: "25000"
+                    JRemainingSeats: 4
+                count: 10
+                hasMore: true
+                moreURL: "/partnerapi/availability?take=10&skip=10&origin_region=North+America&destination_region=North+America&cursor=1759808406&start_date=2025-10-25&end_date=2025-10-25"
+                cursor: 1759808406
+        '400':
+          description: Bad request - Invalid parameters
+        '401':
+          description: Unauthorized
+        '429':
+          description: Rate limit exceeded
+
+  /trips/{id}:
+    get:
+      summary: Get Trips
+      description: |
+        Retrieve flight-level information from an Availability object. Use this endpoint
+        to get detailed flight information from high-level availability objects returned
+        in Get Availability and Cached Search.
+
+        Returns individual availability trips with complete flight segment details including
+        aircraft types, fare classes, and precise timing information.
+      operationId: getTrips
+      tags:
+        - Trips
+      parameters:
+        - name: id
+          in: path
+          description: The ID of the availability object
+          required: true
+          schema:
+            type: string
+          example: "2PPrELk9WcfJaNREWEPXypvhXAD"
+        - name: include_filtered
+          in: query
+          description: Include expensive dynamically-priced results that may have been filtered out
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: Successful response with trip details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TripsResponse'
+              example:
+                data:
+                  - ID: "2S8Cm9dHORWWKpoCkxfRkZa0e5l"
+                    RouteID: "2B9HOBW9EOvJQDTQqxc3UKEhhur"
+                    AvailabilityID: "2PPrELk9WcfJaNREWEPXypvhXAD"
+                    Cabin: "business"
+                    MileageCost: 70000
+                    TotalTaxes: 1290
+                    RemainingSeats: 9
+                    Stops: 1
+                    TotalDuration: 1133
+                    FlightNumbers: "CM326, TK800"
+                origin_coordinates:
+                  Lat: 21.036500930800003
+                  Lon: -86.8770980835
+                destination_coordinates:
+                  Lat: 40.9768981934
+                  Lon: 28.814599990799998
+                booking_links:
+                  - label: "Book via Avianca LifeMiles"
+                    link: "https://www.lifemiles.com/fly/find"
+                    primary: true
+        '400':
+          description: Bad request - Invalid availability ID
+        '401':
+          description: Unauthorized
+        '404':
+          description: Availability ID not found
+
+  /routes:
+    get:
+      summary: Get Routes
+      description: |
+        Retrieve route information for a specific mileage program. Returns the available
+        routes that are tracked by Seats.aero for the specified source.
+      operationId: getRoutes
+      tags:
+        - Routes
+      parameters:
+        - name: source
+          in: query
+          description: Mileage program source
+          required: true
+          schema:
+            type: string
+            enum:
+              - aeroplan
+              - alaska
+              - american
+              - united
+              - delta
+              - jetblue
+              - virginatlantic
+              - flyingblue
+              - lifemiles
+              - avianca
+              - etihad
+              - emirates
+              - qantas
+              - velocity
+              - singapore
+              - turkish
+              - qatar
+              - connectmiles
+              - azul
+              - smiles
+              - eurobonus
+              - aeromexico
+              - ethiopian
+              - saudia
+              - finnair
+          example: "aeroplan"
+      responses:
+        '200':
+          description: Successful response with routes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoutesResponse'
+              example:
+                - ID: "2QghXwB1QjGRYbTBKFBkSDD1Wcs"
+                  OriginAirport: "TPE"
+                  OriginRegion: "Asia"
+                  DestinationAirport: "PNH"
+                  DestinationRegion: "Asia"
+                  NumDaysOut: 60
+                  Distance: 1423
+                  Source: "aeroplan"
+        '400':
+          description: Bad request - Invalid or missing source parameter
+        '401':
+          description: Unauthorized
+
+  /live:
+    post:
+      summary: Live Search
+      description: |
+        Search supported mileage programs for any city pair and date in real-time.
+        Does not need to be a supported route. Results are discarded and not displayed
+        on Seats.aero site.
+
+        **Note**: This endpoint requires a commercial agreement and cannot be used by
+        Pro users at this time.
+
+        **Important**:
+        - Response time: 5-15 seconds
+        - Failed searches not counted against quota
+        - Implement exponential backoff for retries
+        - Identifiers from live search cannot be used with other APIs
+      operationId: liveSearch
+      tags:
+        - Search
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LiveSearchRequest'
+      responses:
+        '200':
+          description: Successful live search results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LiveSearchResponse'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Requires commercial agreement
+        '429':
+          description: Rate limit exceeded
+        '500':
+          description: Search failed - airline system unavailable
+
+components:
+  securitySchemes:
+    PartnerAuthorization:
+      type: apiKey
+      in: header
+      name: Partner-Authorization
+      description: API key for authentication. Pro users can generate at https://seats.aero/apikey
+
+  schemas:
+    SearchResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Availability'
+        count:
+          type: integer
+          description: Number of results in this response
+          example: 29
+        hasMore:
+          type: boolean
+          description: Whether there are more results available
+          example: false
+        cursor:
+          type: integer
+          description: Cursor value for pagination (Unix timestamp)
+          example: 1759808192
+
+    AvailabilityResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Availability'
+        count:
+          type: integer
+          description: Number of results in this response
+          example: 10
+        hasMore:
+          type: boolean
+          description: Whether there are more results available
+          example: true
+        moreURL:
+          type: string
+          description: URL for fetching the next page of results
+          example: "/partnerapi/availability?take=10&skip=10&origin_region=North+America&destination_region=North+America&cursor=1759808406&start_date=2025-10-25&end_date=2025-10-25"
+        cursor:
+          type: integer
+          description: Cursor value for pagination (Unix timestamp)
+          example: 1759808406
+
+    TripsResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          description: Array of availability trips with flight details
+          items:
+            $ref: '#/components/schemas/AvailabilityTrip'
+        origin_coordinates:
+          type: object
+          description: Origin airport coordinates
+          properties:
+            Lat:
+              type: number
+              format: double
+              example: 21.036500930800003
+            Lon:
+              type: number
+              format: double
+              example: -86.8770980835
+        destination_coordinates:
+          type: object
+          description: Destination airport coordinates
+          properties:
+            Lat:
+              type: number
+              format: double
+              example: 40.9768981934
+            Lon:
+              type: number
+              format: double
+              example: 28.814599990799998
+        booking_links:
+          type: array
+          description: Links to book these flights on various programs
+          items:
+            type: object
+            properties:
+              label:
+                type: string
+                description: Display label for the booking link
+                example: "Book via Avianca LifeMiles"
+              link:
+                type: string
+                description: URL to booking page
+                example: "https://www.lifemiles.com/fly/find"
+              primary:
+                type: boolean
+                description: Whether this is the primary booking option
+                example: true
+
+    RoutesResponse:
+      type: array
+      description: Array of routes for the specified mileage program
+      items:
+        $ref: '#/components/schemas/Route'
+
+    LiveSearchRequest:
+      type: object
+      required:
+        - source
+        - origin
+        - destination
+        - date
+      properties:
+        source:
+          type: string
+          description: Mileage program source
+          example: "aeroplan"
+        origin:
+          type: string
+          description: Origin airport code
+          example: "SFO"
+        destination:
+          type: string
+          description: Destination airport code
+          example: "NRT"
+        date:
+          type: string
+          format: date
+          description: Departure date
+          example: "2025-06-15"
+        cabin:
+          type: string
+          enum: [Y, W, J, F]
+          description: Cabin class
+          example: "J"
+        direct:
+          type: boolean
+          description: Direct flights only
+        disable_price_filtering:
+          type: boolean
+          description: Disable dynamic price filtering to see expensive options
+
+    LiveSearchResponse:
+      type: object
+      properties:
+        trips:
+          type: array
+          description: Array of availability trips (no summary object for live searches)
+          items:
+            $ref: '#/components/schemas/AvailabilityTrip'
+
+    Availability:
+      type: object
+      description: Summary object that summarizes availability for a route on a given departure date
+      properties:
+        ID:
+          type: string
+          description: Unique identifier for this availability
+          example: "2pFyV1PuOIyaYWDgOoNHpJtf6x5"
+        RouteID:
+          type: string
+          description: Route identifier
+          example: "2HmZ2Xah52QzyddIB7JAM28jKqs"
+        Route:
+          $ref: '#/components/schemas/Route'
+        Date:
+          type: string
+          format: date
+          description: Departure date
+          example: "2025-10-20"
+        ParsedDate:
+          type: string
+          format: date-time
+          description: Parsed departure date with time
+          example: "2025-10-20T00:00:00Z"
+        Source:
+          type: string
+          description: Mileage program source
+          example: "american"
+        TaxesCurrency:
+          type: string
+          description: Currency code for taxes
+          example: "USD"
+        CreatedAt:
+          type: string
+          format: date-time
+          example: "2024-11-23T15:35:37.891904Z"
+        UpdatedAt:
+          type: string
+          format: date-time
+          example: "2025-10-07T03:17:13.769574Z"
+        AvailabilityTrips:
+          type: array
+          nullable: true
+          description: Array of trips (null unless include_trips=true)
+          items:
+            $ref: '#/components/schemas/AvailabilityTrip'
+        YAvailable:
+          type: boolean
+          description: Economy class available (after filtering)
+        YAvailableRaw:
+          type: boolean
+          description: Economy class available (before filtering)
+        YDirect:
+          type: boolean
+          description: Direct economy flights available (after filtering)
+        YDirectRaw:
+          type: boolean
+          description: Direct economy flights available (before filtering)
+        YMileageCost:
+          type: string
+          description: Minimum economy mileage cost (after filtering)
+          example: "27000"
+        YMileageCostRaw:
+          type: integer
+          description: Minimum economy mileage cost (before filtering)
+          example: 27000
+        YDirectMileageCost:
+          type: string
+          description: Minimum direct economy mileage cost (after filtering)
+        YDirectMileageCostRaw:
+          type: integer
+          description: Minimum direct economy mileage cost (before filtering)
+        YTotalTaxes:
+          type: integer
+          description: Economy taxes in cents (after filtering)
+          example: 560
+        YTotalTaxesRaw:
+          type: integer
+          description: Economy taxes in cents (before filtering)
+        YDirectTotalTaxes:
+          type: integer
+          description: Direct economy taxes in cents (after filtering)
+        YDirectTotalTaxesRaw:
+          type: integer
+          description: Direct economy taxes in cents (before filtering)
+        YRemainingSeats:
+          type: integer
+          description: Remaining economy seats (after filtering, 0 if not provided)
+          example: 0
+        YRemainingSeatsRaw:
+          type: integer
+          description: Remaining economy seats (before filtering)
+        YDirectRemainingSeats:
+          type: integer
+          description: Remaining direct economy seats (after filtering)
+        YDirectRemainingSeatsRaw:
+          type: integer
+          description: Remaining direct economy seats (before filtering)
+        YAirlines:
+          type: string
+          description: Comma-separated airline codes with economy availability (after filtering)
+          example: "AA, BA"
+        YAirlinesRaw:
+          type: string
+          description: Comma-separated airline codes with economy availability (before filtering)
+        YDirectAirlines:
+          type: string
+          description: Comma-separated airline codes with direct economy (after filtering)
+        YDirectAirlinesRaw:
+          type: string
+          description: Comma-separated airline codes with direct economy (before filtering)
+        WAvailable:
+          type: boolean
+          description: Premium economy class available (after filtering)
+        WAvailableRaw:
+          type: boolean
+          description: Premium economy class available (before filtering)
+        WDirect:
+          type: boolean
+        WDirectRaw:
+          type: boolean
+        WMileageCost:
+          type: string
+        WMileageCostRaw:
+          type: integer
+        WDirectMileageCost:
+          type: string
+        WDirectMileageCostRaw:
+          type: integer
+        WTotalTaxes:
+          type: integer
+        WTotalTaxesRaw:
+          type: integer
+        WDirectTotalTaxes:
+          type: integer
+        WDirectTotalTaxesRaw:
+          type: integer
+        WRemainingSeats:
+          type: integer
+        WRemainingSeatsRaw:
+          type: integer
+        WDirectRemainingSeats:
+          type: integer
+        WDirectRemainingSeatsRaw:
+          type: integer
+        WAirlines:
+          type: string
+        WAirlinesRaw:
+          type: string
+        WDirectAirlines:
+          type: string
+        WDirectAirlinesRaw:
+          type: string
+        JAvailable:
+          type: boolean
+          description: Business class available (after filtering)
+        JAvailableRaw:
+          type: boolean
+          description: Business class available (before filtering)
+        JDirect:
+          type: boolean
+          description: Direct business flights available (after filtering)
+        JDirectRaw:
+          type: boolean
+          description: Direct business flights available (before filtering)
+        JMileageCost:
+          type: string
+          description: Minimum business mileage cost (after filtering)
+          example: "57500"
+        JMileageCostRaw:
+          type: integer
+          description: Minimum business mileage cost (before filtering)
+          example: 57500
+        JDirectMileageCost:
+          type: string
+        JDirectMileageCostRaw:
+          type: integer
+        JTotalTaxes:
+          type: integer
+          description: Business taxes in cents (after filtering)
+        JTotalTaxesRaw:
+          type: integer
+        JDirectTotalTaxes:
+          type: integer
+        JDirectTotalTaxesRaw:
+          type: integer
+        JRemainingSeats:
+          type: integer
+          description: Remaining business seats (after filtering)
+          example: 3
+        JRemainingSeatsRaw:
+          type: integer
+        JDirectRemainingSeats:
+          type: integer
+        JDirectRemainingSeatsRaw:
+          type: integer
+        JAirlines:
+          type: string
+          description: Comma-separated airline codes with business availability (after filtering)
+          example: "AA, BA"
+        JAirlinesRaw:
+          type: string
+        JDirectAirlines:
+          type: string
+        JDirectAirlinesRaw:
+          type: string
+        FAvailable:
+          type: boolean
+          description: First class available (after filtering)
+        FAvailableRaw:
+          type: boolean
+          description: First class available (before filtering)
+        FDirect:
+          type: boolean
+        FDirectRaw:
+          type: boolean
+        FMileageCost:
+          type: string
+        FMileageCostRaw:
+          type: integer
+        FDirectMileageCost:
+          type: string
+        FDirectMileageCostRaw:
+          type: integer
+        FTotalTaxes:
+          type: integer
+        FTotalTaxesRaw:
+          type: integer
+        FDirectTotalTaxes:
+          type: integer
+        FDirectTotalTaxesRaw:
+          type: integer
+        FRemainingSeats:
+          type: integer
+        FRemainingSeatsRaw:
+          type: integer
+        FDirectRemainingSeats:
+          type: integer
+        FDirectRemainingSeatsRaw:
+          type: integer
+        FAirlines:
+          type: string
+        FAirlinesRaw:
+          type: string
+        FDirectAirlines:
+          type: string
+        FDirectAirlinesRaw:
+          type: string
+
+    Route:
+      type: object
+      properties:
+        ID:
+          type: string
+          description: Route identifier
+          example: "2HmZ2Xah52QzyddIB7JAM28jKqs"
+        OriginAirport:
+          type: string
+          description: Origin airport code
+          example: "JFK"
+        OriginRegion:
+          type: string
+          description: Origin region
+          example: "North America"
+        DestinationAirport:
+          type: string
+          description: Destination airport code
+          example: "LHR"
+        DestinationRegion:
+          type: string
+          description: Destination region
+          example: "Europe"
+        NumDaysOut:
+          type: integer
+          description: Number of days out this route is tracked
+          example: 60
+        Distance:
+          type: integer
+          description: Distance in miles
+          example: 3446
+        Source:
+          type: string
+          description: Mileage program source
+          example: "american"
+
+    AvailabilityTrip:
+      type: object
+      description: |
+        Specific trip representing one cabin available on a particular set of flight numbers.
+        All times are in airport local times.
+      properties:
+        ID:
+          type: string
+          description: Trip identifier
+          example: "2S8Cm9dHORWWKpoCkxfRkZa0e5l"
+        RouteID:
+          type: string
+          description: Route identifier
+          example: "2B9HOBW9EOvJQDTQqxc3UKEhhur"
+        AvailabilityID:
+          type: string
+          description: Parent availability ID (not valid for live searches)
+          example: "2PPrELk9WcfJaNREWEPXypvhXAD"
+        Source:
+          type: string
+          description: Mileage program source
+          example: "lifemiles"
+        Cabin:
+          type: string
+          description: Cabin class
+          enum: [economy, premium_economy, business, first]
+          example: "business"
+        DepartsAt:
+          type: string
+          format: date-time
+          description: Departure time in airport local time
+          example: "2024-05-01T13:52:00Z"
+        ArrivesAt:
+          type: string
+          format: date-time
+          description: Arrival time in airport local time
+          example: "2024-05-02T16:45:00Z"
+        TotalDuration:
+          type: integer
+          description: Total duration in minutes
+          example: 1133
+        Stops:
+          type: integer
+          description: Number of stops
+          example: 1
+        Carriers:
+          type: string
+          description: Comma-separated carrier codes
+          example: "CM, TK"
+        FlightNumbers:
+          type: string
+          description: Comma-separated flight numbers
+          example: "CM326, TK800"
+        RemainingSeats:
+          type: integer
+          description: Number of remaining seats (9 means 9+)
+          example: 9
+        MileageCost:
+          type: integer
+          description: Cost in miles
+          example: 70000
+        TotalTaxes:
+          type: integer
+          description: Total taxes in cents (1290 = $12.90)
+          example: 1290
+        TaxesCurrency:
+          type: string
+          description: Currency code for taxes (may be empty)
+          example: ""
+        TaxesCurrencySymbol:
+          type: string
+          description: Currency symbol (may be empty)
+          example: ""
+        AllianceCost:
+          type: integer
+          description: Alliance-normalized cost for comparison
+          example: 87944
+        AvailabilitySegments:
+          type: array
+          description: Individual flight segments
+          items:
+            $ref: '#/components/schemas/AvailabilitySegment'
+        CreatedAt:
+          type: string
+          format: date-time
+          example: "2023-07-05T01:02:57.782804Z"
+        UpdatedAt:
+          type: string
+          format: date-time
+          example: "2023-07-08T07:12:25.266914Z"
+
+    AvailabilitySegment:
+      type: object
+      description: Individual flight segment within a trip
+      properties:
+        ID:
+          type: string
+          example: "2S8CmA8bXa9KHaxZfUtihUzRTPd"
+        RouteID:
+          type: string
+        AvailabilityID:
+          type: string
+        AvailabilityTripID:
+          type: string
+        FlightNumber:
+          type: string
+          description: Flight number
+          example: "CM326"
+        OriginAirport:
+          type: string
+          description: Departure airport code
+          example: "CUN"
+        DestinationAirport:
+          type: string
+          description: Arrival airport code
+          example: "PTY"
+        DepartsAt:
+          type: string
+          format: date-time
+          description: Departure time in airport local time
+          example: "2024-05-01T13:52:00Z"
+        ArrivesAt:
+          type: string
+          format: date-time
+          description: Arrival time in airport local time
+          example: "2024-05-01T16:31:00Z"
+        Distance:
+          type: integer
+          description: Segment distance in miles
+          example: 966
+        FareClass:
+          type: string
+          description: Booking/fare class
+          example: "I"
+        AircraftCode:
+          type: string
+          description: Aircraft type code
+          example: "739"
+        AircraftName:
+          type: string
+          description: Aircraft type name
+          example: "739"
+        Source:
+          type: string
+          description: Mileage program source
+          example: "lifemiles"
+        Order:
+          type: integer
+          description: Segment order in trip (0-indexed)
+          example: 0
+        CreatedAt:
+          type: string
+          format: date-time
+        UpdatedAt:
+          type: string
+          format: date-time
+
+    MileageProgram:
+      type: object
+      description: Supported mileage programs (sources)
+      properties:
+        source_code:
+          type: string
+          description: Source identifier used in API calls
+        name:
+          type: string
+          description: Mileage program name
+        cabins:
+          type: array
+          items:
+            type: string
+            enum: [Y, W, J, F]
+          description: Supported cabin classes
+        has_seat_count:
+          type: boolean
+          description: Whether seat counts are provided
+        has_trip_data:
+          type: boolean
+          description: Whether individual flight data is available
+        has_taxes:
+          type: boolean
+          description: Whether taxes and surcharges are available
+      example:
+        source_code: "aeroplan"
+        name: "Air Canada Aeroplan"
+        cabins: ["Y", "W", "J", "F"]
+        has_seat_count: false
+        has_trip_data: true
+        has_taxes: true

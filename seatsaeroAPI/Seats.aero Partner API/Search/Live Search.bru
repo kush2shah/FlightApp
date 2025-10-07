@@ -1,0 +1,27 @@
+meta {
+  name: Live Search
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/live
+  body: json
+  auth: none
+}
+
+headers {
+  Partner-Authorization: {{apiKey}}
+}
+
+body:json {
+  {
+    "source": "",
+    "origin": "",
+    "destination": "",
+    "date": "",
+    "cabin": "",
+    "direct": false,
+    "disable_price_filtering": false
+  }
+}

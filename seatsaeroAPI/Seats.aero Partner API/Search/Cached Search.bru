@@ -1,0 +1,33 @@
+meta {
+  name: Cached Search
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/search
+  body: none
+  auth: none
+}
+
+params:query {
+  origin_airport: 
+  destination_airport: 
+  ~start_date: 
+  ~end_date: 
+  ~sources: 
+  ~cabins: 
+  ~carriers: 
+  ~only_direct_flights: 
+  ~take: 
+  ~skip: 
+  ~cursor: 
+  ~order_by: 
+  ~include_trips: 
+  ~minify_trips: 
+  ~include_filtered: 
+}
+
+headers {
+  Partner-Authorization: {{apiKey}}
+}

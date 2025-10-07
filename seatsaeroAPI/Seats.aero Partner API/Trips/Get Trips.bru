@@ -1,0 +1,23 @@
+meta {
+  name: Get Trips
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/trips/:id
+  body: none
+  auth: none
+}
+
+params:query {
+  ~include_filtered: 
+}
+
+params:path {
+  id: 
+}
+
+headers {
+  Partner-Authorization: {{apiKey}}
+}

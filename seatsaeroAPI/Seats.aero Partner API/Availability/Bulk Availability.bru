@@ -1,0 +1,27 @@
+meta {
+  name: Bulk Availability
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/availability
+  body: none
+  auth: none
+}
+
+params:query {
+  source: 
+  ~cabin: 
+  ~start_date: 
+  ~end_date: 
+  ~origin_region: 
+  ~destination_region: 
+  ~take: 
+  ~skip: 
+  ~cursor: 
+}
+
+headers {
+  Partner-Authorization: {{apiKey}}
+}
