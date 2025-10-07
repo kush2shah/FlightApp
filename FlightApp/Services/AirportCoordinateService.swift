@@ -49,7 +49,9 @@ class AirportCoordinateService {
         "RAK": AirportCoordinate(code: "RAK", coordinate: CLLocationCoordinate2D(latitude: 31.6068, longitude: -8.0363), name: "Marrakesh Menara"),
         "DOH": AirportCoordinate(code: "DOH", coordinate: CLLocationCoordinate2D(latitude: 25.2731, longitude: 51.6081), name: "Hamad International"),
         "PER": AirportCoordinate(code: "PER", coordinate: CLLocationCoordinate2D(latitude: -31.9385, longitude: 115.9672), name: "Perth Airport"),
-        "RDU": AirportCoordinate(code: "RDU", coordinate: CLLocationCoordinate2D(latitude: 35.8776, longitude: -78.7875), name: "Raleigh-Durham International")
+        "RDU": AirportCoordinate(code: "RDU", coordinate: CLLocationCoordinate2D(latitude: 35.8776, longitude: -78.7875), name: "Raleigh-Durham International"),
+        "KEF": AirportCoordinate(code: "KEF", coordinate: CLLocationCoordinate2D(latitude: 63.9850, longitude: -22.6056), name: "Keflavik International"),
+        "BIKF": AirportCoordinate(code: "BIKF", coordinate: CLLocationCoordinate2D(latitude: 63.9850, longitude: -22.6056), name: "Keflavik International")
     ]
     
     func getCoordinate(for airportCode: String) -> AirportCoordinate? {

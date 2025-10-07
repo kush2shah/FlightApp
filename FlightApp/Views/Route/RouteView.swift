@@ -412,15 +412,18 @@ struct SimpleRouteMapView: UIViewRepresentable {
     }
 
     func updateUIView(_ mapView: MKMapView, context: Context) {
+        // Clear existing overlays
+        mapView.removeOverlays(mapView.overlays)
+
         let origin = CLLocationCoordinate2D(latitude: originLat, longitude: originLon)
         let dest = CLLocationCoordinate2D(latitude: destLat, longitude: destLon)
 
-        // Add route line
-        let coordinates = [origin, dest]
-        let polyline = MKPolyline(coordinates: coordinates, count: 2)
+        // Create great circle arc (curved path) between airports
+        let arcCoordinates = createGreatCircleArc(from: origin, to: dest, points: 100)
+        let polyline = MKPolyline(coordinates: arcCoordinates, count: arcCoordinates.count)
         mapView.addOverlay(polyline)
 
-        // Fit to show both airports
+        // Fit to show both airports with some padding
         let midLat = (originLat + destLat) / 2
         let midLon = (originLon + destLon) / 2
         let latDelta = abs(originLat - destLat) * 1.5
@@ -431,6 +434,42 @@ struct SimpleRouteMapView: UIViewRepresentable {
             span: MKCoordinateSpan(latitudeDelta: max(latDelta, 5), longitudeDelta: max(lonDelta, 5))
         )
         mapView.setRegion(region, animated: false)
+    }
+
+    // Create great circle arc between two points
+    private func createGreatCircleArc(from start: CLLocationCoordinate2D, to end: CLLocationCoordinate2D, points: Int) -> [CLLocationCoordinate2D] {
+        var coordinates: [CLLocationCoordinate2D] = []
+
+        // Convert to radians
+        let lat1 = start.latitude * .pi / 180
+        let lon1 = start.longitude * .pi / 180
+        let lat2 = end.latitude * .pi / 180
+        let lon2 = end.longitude * .pi / 180
+
+        // Calculate great circle distance
+        let d = 2 * asin(sqrt(pow(sin((lat1 - lat2) / 2), 2) + cos(lat1) * cos(lat2) * pow(sin((lon1 - lon2) / 2), 2)))
+
+        // Generate points along the arc
+        for i in 0...points {
+            let fraction = Double(i) / Double(points)
+
+            let a = sin((1 - fraction) * d) / sin(d)
+            let b = sin(fraction * d) / sin(d)
+
+            let x = a * cos(lat1) * cos(lon1) + b * cos(lat2) * cos(lon2)
+            let y = a * cos(lat1) * sin(lon1) + b * cos(lat2) * sin(lon2)
+            let z = a * sin(lat1) + b * sin(lat2)
+
+            let lat = atan2(z, sqrt(x * x + y * y))
+            let lon = atan2(y, x)
+
+            coordinates.append(CLLocationCoordinate2D(
+                latitude: lat * 180 / .pi,
+                longitude: lon * 180 / .pi
+            ))
+        }
+
+        return coordinates
     }
 
     func makeCoordinator() -> Coordinator {
