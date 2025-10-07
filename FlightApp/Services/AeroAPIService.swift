@@ -201,18 +201,169 @@ class AeroAPIService {
         }
     }
     
+    // MARK: - Route Endpoints
+
+    /// Get flights between two airports
+    func getFlightsBetweenAirports(
+        origin: String,
+        destination: String,
+        startDate: Date? = nil,
+        endDate: Date? = nil,
+        connection: String? = "nonstop"
+    ) async throws -> [AeroFlight] {
+        // Construct URL
+        let cleanOrigin = origin.uppercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleanDest = destination.uppercased().trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard var urlComponents = URLComponents(string: "\(baseURL)/airports/\(cleanOrigin)/flights/to/\(cleanDest)") else {
+            throw AeroAPIError.invalidURL
+        }
+
+        let formatter = ISO8601DateFormatter()
+        var queryItems: [URLQueryItem] = []
+
+        if let startDate = startDate {
+            queryItems.append(URLQueryItem(name: "start", value: formatter.string(from: startDate)))
+        }
+
+        if let endDate = endDate {
+            queryItems.append(URLQueryItem(name: "end", value: formatter.string(from: endDate)))
+        }
+
+        if let connection = connection {
+            queryItems.append(URLQueryItem(name: "connection", value: connection))
+        }
+
+        queryItems.append(URLQueryItem(name: "max_pages", value: "1"))
+
+        urlComponents.queryItems = queryItems
+
+        guard let url = urlComponents.url else {
+            throw AeroAPIError.invalidURL
+        }
+
+        var request = URLRequest(url: url)
+        request.setValue(apiKey, forHTTPHeaderField: "x-apikey")
+
+        print("🛫 Fetching flights: \(cleanOrigin) → \(cleanDest)")
+
+        do {
+            let (data, urlResponse) = try await URLSession.shared.data(for: request)
+
+            guard let httpResponse = urlResponse as? HTTPURLResponse else {
+                throw AeroAPIError.invalidResponse
+            }
+
+            print("📡 Route Flights Response Status: \(httpResponse.statusCode)")
+
+            guard (200...299).contains(httpResponse.statusCode) else {
+                switch httpResponse.statusCode {
+                case 429:
+                    throw AeroAPIError.rateLimitExceeded
+                case 400, 404:
+                    throw AeroAPIError.noFlightsFound
+                default:
+                    throw AeroAPIError.serverError(httpResponse.statusCode)
+                }
+            }
+
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601
+
+            let response = try decoder.decode(AeroRouteFlightsResponse.self, from: data)
+
+            // Flatten segments into individual flights
+            var allFlights: [AeroFlight] = []
+            for flight in response.flights {
+                allFlights.append(contentsOf: flight.segments)
+            }
+
+            print("✅ Found \(allFlights.count) flights on route")
+
+            return allFlights
+        } catch let error as AeroAPIError {
+            throw error
+        } catch {
+            print("❌ Route flights error: \(error)")
+            throw AeroAPIError.decodingError
+        }
+    }
+
+    /// Get IFR route information between two airports
+    func getRouteInfo(
+        origin: String,
+        destination: String
+    ) async throws -> [IFRRouteInfo] {
+        let cleanOrigin = origin.uppercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleanDest = destination.uppercased().trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard var urlComponents = URLComponents(string: "\(baseURL)/airports/\(cleanOrigin)/routes/\(cleanDest)") else {
+            throw AeroAPIError.invalidURL
+        }
+
+        urlComponents.queryItems = [
+            URLQueryItem(name: "max_pages", value: "1"),
+            URLQueryItem(name: "sort_by", value: "count")
+        ]
+
+        guard let url = urlComponents.url else {
+            throw AeroAPIError.invalidURL
+        }
+
+        var request = URLRequest(url: url)
+        request.setValue(apiKey, forHTTPHeaderField: "x-apikey")
+
+        print("🗺️ Fetching route info: \(cleanOrigin) → \(cleanDest)")
+
+        do {
+            let (data, urlResponse) = try await URLSession.shared.data(for: request)
+
+            guard let httpResponse = urlResponse as? HTTPURLResponse else {
+                throw AeroAPIError.invalidResponse
+            }
+
+            print("📡 Route Info Response Status: \(httpResponse.statusCode)")
+
+            guard (200...299).contains(httpResponse.statusCode) else {
+                switch httpResponse.statusCode {
+                case 429:
+                    throw AeroAPIError.rateLimitExceeded
+                case 400, 404:
+                    // No route info available, return empty array
+                    return []
+                default:
+                    throw AeroAPIError.serverError(httpResponse.statusCode)
+                }
+            }
+
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601
+
+            let response = try decoder.decode(AeroRouteInfoResponse.self, from: data)
+
+            print("✅ Found \(response.routes.count) IFR routes")
+
+            return response.routes
+        } catch let error as AeroAPIError {
+            throw error
+        } catch {
+            print("❌ Route info error: \(error)")
+            throw AeroAPIError.decodingError
+        }
+    }
+
     // The search strategy methods remain the same
     private func createPreciseIdentSearch(_ flightNumber: String) -> URLComponents? {
         var urlComponents = URLComponents(string: "\(baseURL)/flights/\(flightNumber)")
         return urlComponents
     }
-    
+
     private func createAirlineAndNumberSearch(_ flightNumber: String) -> URLComponents? {
         guard flightNumber.count >= 3 else { return nil }
-        
+
         let airlineCode = String(flightNumber.prefix(2))
         let number = String(flightNumber.dropFirst(2))
-        
+
         var urlComponents = URLComponents(string: "\(baseURL)/flights/search")
         urlComponents?.queryItems = [
             URLQueryItem(name: "query", value: "-airline \(airlineCode) -ident \(number)"),
@@ -220,7 +371,7 @@ class AeroAPIService {
         ]
         return urlComponents
     }
-    
+
     private func createWildcardIdentSearch(_ flightNumber: String) -> URLComponents? {
         var urlComponents = URLComponents(string: "\(baseURL)/flights/search")
         urlComponents?.queryItems = [
@@ -228,5 +379,41 @@ class AeroAPIService {
             URLQueryItem(name: "max_pages", value: "1")
         ]
         return urlComponents
+    }
+}
+
+// MARK: - Route Response Models
+
+struct AeroRouteFlightsResponse: Codable {
+    let flights: [RouteFullFlight]
+}
+
+struct RouteFullFlight: Codable {
+    let segments: [AeroFlight]
+}
+
+struct AeroRouteInfoResponse: Codable {
+    let routes: [IFRRouteInfo]
+}
+
+struct IFRRouteInfo: Codable, Identifiable {
+    let route: String
+    let count: Int
+    let aircraftTypes: [String]
+    let filedAltitudeMin: Int
+    let filedAltitudeMax: Int
+    let lastDepartureTime: String
+    let routeDistance: String
+
+    var id: String { route }
+
+    enum CodingKeys: String, CodingKey {
+        case route
+        case count
+        case aircraftTypes = "aircraft_types"
+        case filedAltitudeMin = "filed_altitude_min"
+        case filedAltitudeMax = "filed_altitude_max"
+        case lastDepartureTime = "last_departure_time"
+        case routeDistance = "route_distance"
     }
 }

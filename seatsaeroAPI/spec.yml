@@ -451,13 +451,16 @@ paths:
   /live:
     post:
       summary: Live Search
+      deprecated: true
       description: |
+        **NOT AVAILABLE FOR THIS PROJECT** - Requires commercial agreement only.
+
         Search supported mileage programs for any city pair and date in real-time.
         Does not need to be a supported route. Results are discarded and not displayed
         on Seats.aero site.
 
         **Note**: This endpoint requires a commercial agreement and cannot be used by
-        Pro users at this time.
+        Pro users at this time. We will not be using this endpoint in FlightApp.
 
         **Important**:
         - Response time: 5-15 seconds

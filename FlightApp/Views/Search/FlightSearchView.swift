@@ -10,13 +10,15 @@ import SwiftUI
 struct FlightSearchView: View {
     @State private var searchText = ""
     @State private var selectedFlightNumber: IdentifiableString?
+    @State private var selectedRoute: RouteIdentifier?
     @State private var availableFlights: [AeroFlight] = []
     @State private var showFlightSelectionSheet = false
     @State private var isSearching = false
     @State private var searchError: String? = nil
     @State private var showErrorAlert = false
+    @State private var showSettings = false
     @FocusState private var isSearchFocused: Bool
-    
+
     @StateObject private var recentSearchStore = RecentSearchStore()
     
     
@@ -63,6 +65,16 @@ struct FlightSearchView: View {
             .navigationTitle("Track Flight")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button(action: {
+                        showSettings = true
+                    }) {
+                        Image(systemName: "gearshape")
+                            .font(.system(size: 18))
+                            .foregroundColor(.secondary)
+                    }
+                }
+
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Menu {
                         ForEach(PopularRouteStore.routes.prefix(6)) { route in
@@ -72,9 +84,9 @@ struct FlightSearchView: View {
                                 Label(route.routeDisplayName, systemImage: "airplane")
                             }
                         }
-                        
+
                         Divider()
-                        
+
                         Button(action: {
                             // Could expand to show all routes in future
                         }) {
@@ -86,6 +98,9 @@ struct FlightSearchView: View {
                             .foregroundColor(.secondary)
                     }
                 }
+            }
+            .sheet(isPresented: $showSettings) {
+                SettingsView()
             }
             .background(
                 LinearGradient(
@@ -110,6 +125,9 @@ struct FlightSearchView: View {
                 FlightView(flightNumber: identifiableFlightNumber.value, skipFlightSelection: true)
                     .presentationDragIndicator(.visible)
             }
+            .sheet(item: $selectedRoute) { route in
+                RouteView(origin: route.origin, destination: route.destination)
+            }
             .alert("Search Error", isPresented: $showErrorAlert, actions: {
                 Button("OK", role: .cancel) { }
             }, message: {
@@ -125,8 +143,8 @@ struct FlightSearchView: View {
                 .font(.sfRounded(size: 32, weight: .bold))
                 .foregroundColor(.primary)
                 .multilineTextAlignment(.center)
-            
-            Text("Enter any flight number")
+
+            Text("Enter flight number or route")
                 .font(.sfRounded(size: 16))
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
@@ -142,7 +160,7 @@ struct FlightSearchView: View {
                 .font(.system(size: 22, weight: .medium))
                 .foregroundColor(.secondary)
             
-            TextField("AA1, UA60, BA175...", text: $searchText)
+            TextField("AA1 or JFK LHR...", text: $searchText)
                 .font(.sfRounded(size: 20))
                 .textInputAutocapitalization(.characters)
                 .autocorrectionDisabled()
@@ -178,13 +196,12 @@ struct FlightSearchView: View {
     
     private var searchHintsSection: some View {
         VStack(spacing: 12) {
-            HStack(spacing: 20) {
+            HStack(spacing: 12) {
                 searchHintButton("AA1", icon: "airplane")
-                searchHintButton("UA60", icon: "airplane")
-                searchHintButton("BA175", icon: "airplane")
+                searchHintButton("JFK LHR", icon: "arrow.right")
             }
-            
-            Text("Try searching any flight number")
+
+            Text("Try a flight number or route")
                 .font(.sfRounded(size: 14))
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
@@ -425,31 +442,55 @@ struct FlightSearchView: View {
     
     private func searchFlight() {
         guard !searchText.isEmpty else { return }
-        
-        // Store the flight number to search
-        let flightToSearch = searchText.uppercased().trimmingCharacters(in: .whitespacesAndNewlines)
-        
+
+        // Parse input to determine search type
+        let searchType = SearchInputParser.shared.parse(searchText)
+
         // Set searching state to true
         isSearching = true
-        
+
+        switch searchType {
+        case .flightNumber(let flightNumber):
+            searchByFlightNumber(flightNumber)
+
+        case .route(let origin, let destination):
+            // Navigate to RouteView
+            selectedRoute = RouteIdentifier(origin: origin, destination: destination)
+            searchText = ""
+            isSearching = false
+
+        case .invalid:
+            Task {
+                await MainActor.run {
+                    searchError = "Invalid search. Try a flight number (e.g., AA1) or route (e.g., JFK LHR)"
+                    showErrorAlert = true
+                    isSearching = false
+                }
+            }
+        }
+
+        isSearchFocused = false
+    }
+
+    private func searchByFlightNumber(_ flightNumber: String) {
         // Use AeroAPIService to fetch flights
         Task {
             do {
-                let flights = try await AeroAPIService.shared.getFlightInfo(flightToSearch)
-                
+                let flights = try await AeroAPIService.shared.getFlightInfo(flightNumber)
+
                 await MainActor.run {
                     availableFlights = flights
-                    
+
                     if flights.count == 1 {
                         // If only one flight, directly select it without showing selection sheet
                         let flight = flights[0]
                         selectedFlightNumber = IdentifiableString(value: flight.ident)
-                        recentSearchStore.addSearch(flightToSearch)
+                        recentSearchStore.addSearch(flightNumber)
                     } else if !flights.isEmpty {
                         // If multiple flights, show selection sheet
                         showFlightSelectionSheet = true
                     }
-                    
+
                     // Only clear search text after successful search
                     searchText = ""
                     isSearching = false
@@ -472,8 +513,6 @@ struct FlightSearchView: View {
                 print("Error searching flight: \(error)")
             }
         }
-        
-        isSearchFocused = false
     }
     
     private func selectRoute(_ route: PopularRoute) {
@@ -497,6 +536,12 @@ struct FlightSearchView: View {
 struct IdentifiableString: Identifiable {
     let id = UUID()
     let value: String
+}
+
+struct RouteIdentifier: Identifiable {
+    let id = UUID()
+    let origin: String
+    let destination: String
 }
 
 #Preview {
