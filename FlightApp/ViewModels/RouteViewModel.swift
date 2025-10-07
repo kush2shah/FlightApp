@@ -14,9 +14,33 @@ class RouteViewModel: ObservableObject {
     @Published var awards: [AwardAvailability] = []
     @Published var isLoading = false
     @Published var error: String?
+    @Published var originAirport: AeroAirport?
+    @Published var destinationAirport: AeroAirport?
 
     var shouldShowAwards: Bool {
         FeatureFlags.shared.canUseSeatsAero
+    }
+
+    // Primary route to display (most frequently filed)
+    var primaryRoute: IFRRouteInfo? {
+        ifrRoutes.first
+    }
+
+    // Aggregate all aircraft types from all routes
+    var commonAircraft: [String] {
+        let allAircraft = ifrRoutes.flatMap { $0.aircraftTypes }
+        let uniqueAircraft = Array(Set(allAircraft))
+        return Array(uniqueAircraft.prefix(8)) // Top 8
+    }
+
+    // Total flights filed across all routes
+    var totalFlightCount: String {
+        let total = ifrRoutes.reduce(0) { $0 + $1.count }
+        return total > 0 ? "\(total)" : ""
+    }
+
+    var hasAggregateStats: Bool {
+        !commonAircraft.isEmpty || !totalFlightCount.isEmpty
     }
 
     func loadRouteData(origin: String, destination: String) async {
@@ -59,6 +83,13 @@ class RouteViewModel: ObservableObject {
                 connection: "nonstop"
             )
             currentFlights = flights
+
+            // Store origin/destination airport info from first flight
+            if let firstFlight = flights.first {
+                originAirport = firstFlight.origin
+                destinationAirport = firstFlight.destination
+            }
+
             print("✅ Loaded \(flights.count) flights")
         } catch {
             print("⚠️ Failed to load flights: \(error)")

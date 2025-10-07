@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import MapKit
 
 struct RouteView: View {
     let origin: String
@@ -17,7 +18,7 @@ struct RouteView: View {
     var body: some View {
         NavigationView {
             ScrollView {
-                VStack(spacing: 24) {
+                VStack(spacing: 0) {
                     if viewModel.isLoading {
                         loadingView
                     } else if let error = viewModel.error {
@@ -26,7 +27,6 @@ struct RouteView: View {
                         routeContentView
                     }
                 }
-                .padding(.vertical)
             }
             .background(Color(.systemGroupedBackground))
             .navigationTitle("\(origin) → \(destination)")
@@ -74,35 +74,116 @@ struct RouteView: View {
     }
 
     private var routeContentView: some View {
-        VStack(spacing: 24) {
-            // Route stats section
-            if !viewModel.ifrRoutes.isEmpty {
-                routeStatsSection
+        VStack(spacing: 0) {
+            // Route map (hero section)
+            if let primaryRoute = viewModel.primaryRoute {
+                RouteMapSection(
+                    origin: viewModel.originAirport,
+                    destination: viewModel.destinationAirport,
+                    route: primaryRoute
+                )
+                .frame(height: 300)
             }
 
-            // Current flights section
-            if !viewModel.currentFlights.isEmpty {
-                currentFlightsSection
-            }
+            VStack(spacing: 24) {
+                // Route overview stats
+                if let primaryRoute = viewModel.primaryRoute {
+                    routeOverviewSection(primaryRoute)
+                }
 
-            // Award availability section
-            if !viewModel.awards.isEmpty {
-                awardAvailabilitySection
-            } else if viewModel.shouldShowAwards {
-                noAwardsView
+                // Operator & aircraft stats
+                if viewModel.hasAggregateStats {
+                    aggregateStatsSection
+                }
+
+                // Current flights section
+                if !viewModel.currentFlights.isEmpty {
+                    currentFlightsSection
+                }
+
+                // Award availability section
+                if !viewModel.awards.isEmpty {
+                    awardAvailabilitySection
+                } else if viewModel.shouldShowAwards {
+                    noAwardsView
+                }
             }
+            .padding(.vertical, 24)
         }
     }
 
-    private var routeStatsSection: some View {
+    private func routeOverviewSection(_ route: IFRRouteInfo) -> some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Route Information")
-                .font(.sfRounded(size: 22, weight: .bold))
+            Text("Route Details")
+                .font(.sfRounded(size: 20, weight: .bold))
+                .padding(.horizontal)
+
+            VStack(spacing: 16) {
+                // Distance and altitude
+                HStack(spacing: 20) {
+                    StatBox(
+                        icon: "arrow.left.and.right",
+                        label: "Distance",
+                        value: route.routeDistance
+                    )
+                    StatBox(
+                        icon: "arrow.up",
+                        label: "Altitude",
+                        value: "FL\(route.filedAltitudeMin/100)-\(route.filedAltitudeMax/100)"
+                    )
+                }
+
+                // IFR Route
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Image(systemName: "map")
+                            .foregroundColor(.blue)
+                        Text("Filed IFR Route")
+                            .font(.sfRounded(size: 14, weight: .semibold))
+                            .foregroundColor(.secondary)
+                    }
+                    Text(route.route)
+                        .font(.system(size: 12, design: .monospaced))
+                        .foregroundColor(.primary)
+                        .lineLimit(3)
+                        .padding()
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color(.secondarySystemBackground))
+                        .cornerRadius(8)
+                }
+            }
+            .padding(.horizontal)
+        }
+    }
+
+    private var aggregateStatsSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Common Operators & Aircraft")
+                .font(.sfRounded(size: 20, weight: .bold))
                 .padding(.horizontal)
 
             VStack(spacing: 12) {
-                ForEach(viewModel.ifrRoutes.prefix(3)) { route in
-                    RouteStatCard(route: route)
+                if !viewModel.commonAircraft.isEmpty {
+                    InfoCard(
+                        icon: "airplane",
+                        title: "Common Aircraft",
+                        items: viewModel.commonAircraft
+                    )
+                }
+
+                if !viewModel.totalFlightCount.isEmpty {
+                    HStack {
+                        Image(systemName: "chart.bar")
+                            .foregroundColor(.blue)
+                        Text("\(viewModel.totalFlightCount) flights filed on this route")
+                            .font(.sfRounded(size: 14))
+                            .foregroundColor(.secondary)
+                    }
+                    .padding()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color(.systemBackground))
+                    .cornerRadius(12)
+                    .shadow(color: Color.black.opacity(0.05), radius: 4, x: 0, y: 2)
                 }
             }
             .padding(.horizontal)
@@ -166,59 +247,58 @@ struct RouteView: View {
     }
 }
 
-// MARK: - Route Stat Card
+// MARK: - Helper Components
 
-struct RouteStatCard: View {
-    let route: IFRRouteInfo
+struct StatBox: View {
+    let icon: String
+    let label: String
+    let value: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                Image(systemName: icon)
+                    .font(.system(size: 14))
+                    .foregroundColor(.blue)
+                Text(label)
+                    .font(.sfRounded(size: 14, weight: .semibold))
+                    .foregroundColor(.secondary)
+            }
+            Text(value)
+                .font(.sfRounded(size: 18, weight: .bold))
+                .foregroundColor(.primary)
+        }
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(.systemBackground))
+        .cornerRadius(12)
+        .shadow(color: Color.black.opacity(0.05), radius: 4, x: 0, y: 2)
+    }
+}
+
+struct InfoCard: View {
+    let icon: String
+    let title: String
+    let items: [String]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("Route")
+            HStack(spacing: 6) {
+                Image(systemName: icon)
+                    .foregroundColor(.blue)
+                Text(title)
                     .font(.sfRounded(size: 14, weight: .semibold))
                     .foregroundColor(.secondary)
-                Spacer()
-                Text("\(route.count) flights")
-                    .font(.sfRounded(size: 12))
-                    .foregroundColor(.secondary)
             }
-
-            Text(route.route)
-                .font(.system(size: 13, design: .monospaced))
-                .foregroundColor(.primary)
-                .lineLimit(2)
-
-            HStack(spacing: 16) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Altitude")
-                        .font(.sfRounded(size: 12))
-                        .foregroundColor(.secondary)
-                    Text("FL\(route.filedAltitudeMin/100)-\(route.filedAltitudeMax/100)")
-                        .font(.sfRounded(size: 14, weight: .medium))
-                }
-
-                Divider()
-                    .frame(height: 30)
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Distance")
-                        .font(.sfRounded(size: 12))
-                        .foregroundColor(.secondary)
-                    Text(route.routeDistance)
-                        .font(.sfRounded(size: 14, weight: .medium))
-                }
-
-                Spacer()
-            }
-
-            if !route.aircraftTypes.isEmpty {
-                HStack {
-                    Text("Common aircraft:")
-                        .font(.sfRounded(size: 12))
-                        .foregroundColor(.secondary)
-                    Text(route.aircraftTypes.prefix(3).joined(separator: ", "))
-                        .font(.sfRounded(size: 12, weight: .medium))
+            FlowLayout(spacing: 8) {
+                ForEach(items, id: \.self) { item in
+                    Text(item)
+                        .font(.sfRounded(size: 13, weight: .medium))
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(Color.blue.opacity(0.1))
                         .foregroundColor(.blue)
+                        .cornerRadius(8)
                 }
             }
         }
@@ -226,6 +306,131 @@ struct RouteStatCard: View {
         .background(Color(.systemBackground))
         .cornerRadius(12)
         .shadow(color: Color.black.opacity(0.05), radius: 4, x: 0, y: 2)
+    }
+}
+
+// Simple flow layout for tags
+struct FlowLayout: Layout {
+    var spacing: CGFloat = 8
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let result = FlowResult(in: proposal.replacingUnspecifiedDimensions().width, subviews: subviews, spacing: spacing)
+        return result.size
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let result = FlowResult(in: bounds.width, subviews: subviews, spacing: spacing)
+        for (index, subview) in subviews.enumerated() {
+            subview.place(at: CGPoint(x: bounds.minX + result.frames[index].minX, y: bounds.minY + result.frames[index].minY), proposal: .unspecified)
+        }
+    }
+
+    struct FlowResult {
+        var frames: [CGRect] = []
+        var size: CGSize = .zero
+
+        init(in maxWidth: CGFloat, subviews: Subviews, spacing: CGFloat) {
+            var currentX: CGFloat = 0
+            var currentY: CGFloat = 0
+            var lineHeight: CGFloat = 0
+
+            for subview in subviews {
+                let size = subview.sizeThatFits(.unspecified)
+                if currentX + size.width > maxWidth && currentX > 0 {
+                    currentX = 0
+                    currentY += lineHeight + spacing
+                    lineHeight = 0
+                }
+                frames.append(CGRect(x: currentX, y: currentY, width: size.width, height: size.height))
+                currentX += size.width + spacing
+                lineHeight = max(lineHeight, size.height)
+            }
+
+            self.size = CGSize(width: maxWidth, height: currentY + lineHeight)
+        }
+    }
+}
+
+// MARK: - Route Map Section
+
+struct RouteMapSection: View {
+    let origin: AeroAirport?
+    let destination: AeroAirport?
+    let route: IFRRouteInfo
+
+    var body: some View {
+        ZStack {
+            if let origin = origin, let destination = destination {
+                SimpleRouteMapView(
+                    originLat: origin.latitude,
+                    originLon: origin.longitude,
+                    destLat: destination.latitude,
+                    destLon: destination.longitude
+                )
+            } else {
+                Color(.systemGray6)
+                VStack {
+                    Image(systemName: "map")
+                        .font(.system(size: 48))
+                        .foregroundColor(.secondary)
+                    Text("Map unavailable")
+                        .font(.sfRounded(size: 14))
+                        .foregroundColor(.secondary)
+                }
+            }
+        }
+    }
+}
+
+// Simple map view showing route line
+struct SimpleRouteMapView: UIViewRepresentable {
+    let originLat: Double
+    let originLon: Double
+    let destLat: Double
+    let destLon: Double
+
+    func makeUIView(context: Context) -> MKMapView {
+        let mapView = MKMapView()
+        mapView.delegate = context.coordinator
+        return mapView
+    }
+
+    func updateUIView(_ mapView: MKMapView, context: Context) {
+        let origin = CLLocationCoordinate2D(latitude: originLat, longitude: originLon)
+        let dest = CLLocationCoordinate2D(latitude: destLat, longitude: destLon)
+
+        // Add route line
+        let coordinates = [origin, dest]
+        let polyline = MKPolyline(coordinates: coordinates, count: 2)
+        mapView.addOverlay(polyline)
+
+        // Fit to show both airports
+        let midLat = (originLat + destLat) / 2
+        let midLon = (originLon + destLon) / 2
+        let latDelta = abs(originLat - destLat) * 1.5
+        let lonDelta = abs(originLon - destLon) * 1.5
+
+        let region = MKCoordinateRegion(
+            center: CLLocationCoordinate2D(latitude: midLat, longitude: midLon),
+            span: MKCoordinateSpan(latitudeDelta: max(latDelta, 5), longitudeDelta: max(lonDelta, 5))
+        )
+        mapView.setRegion(region, animated: false)
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+
+    class Coordinator: NSObject, MKMapViewDelegate {
+        func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
+            if let polyline = overlay as? MKPolyline {
+                let renderer = MKPolylineRenderer(polyline: polyline)
+                renderer.strokeColor = .systemBlue
+                renderer.lineWidth = 3
+                return renderer
+            }
+            return MKOverlayRenderer(overlay: overlay)
+        }
     }
 }
 
@@ -241,8 +446,8 @@ struct FlightRowCard: View {
                 Text(flight.ident)
                     .font(.sfRounded(size: 16, weight: .bold))
                     .foregroundColor(.blue)
-                if let operator_iata = flight.operator_iata {
-                    Text(operator_iata)
+                if let operatorIata = flight.operatorIata {
+                    Text(operatorIata)
                         .font(.sfRounded(size: 12))
                         .foregroundColor(.secondary)
                 }
