@@ -13,6 +13,7 @@ struct RouteView: View {
     let destination: String
 
     @StateObject private var viewModel = RouteViewModel()
+    @State private var selectedFlightNumber: String?
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -37,6 +38,13 @@ struct RouteView: View {
                         dismiss()
                     }
                 }
+            }
+            .sheet(item: Binding(
+                get: { selectedFlightNumber.map { IdentifiableString(value: $0) } },
+                set: { selectedFlightNumber = $0?.value }
+            )) { identifiableFlightNumber in
+                FlightView(flightNumber: identifiableFlightNumber.value, skipFlightSelection: true)
+                    .presentationDragIndicator(.visible)
             }
         }
         .task {
@@ -198,7 +206,12 @@ struct RouteView: View {
 
             VStack(spacing: 12) {
                 ForEach(viewModel.currentFlights.prefix(10)) { flight in
-                    FlightRowCard(flight: flight)
+                    Button(action: {
+                        selectedFlightNumber = flight.ident
+                    }) {
+                        FlightRowCard(flight: flight)
+                    }
+                    .buttonStyle(PlainButtonStyle())
                 }
             }
             .padding(.horizontal)
@@ -360,12 +373,15 @@ struct RouteMapSection: View {
 
     var body: some View {
         ZStack {
-            if let origin = origin, let destination = destination {
+            if let origin = origin,
+               let destination = destination,
+               let originCoord = AirportCoordinateService.shared.getCoordinate(for: origin.displayCode),
+               let destCoord = AirportCoordinateService.shared.getCoordinate(for: destination.displayCode) {
                 SimpleRouteMapView(
-                    originLat: origin.latitude,
-                    originLon: origin.longitude,
-                    destLat: destination.latitude,
-                    destLon: destination.longitude
+                    originLat: originCoord.coordinate.latitude,
+                    originLon: originCoord.coordinate.longitude,
+                    destLat: destCoord.coordinate.latitude,
+                    destLon: destCoord.coordinate.longitude
                 )
             } else {
                 Color(.systemGray6)
