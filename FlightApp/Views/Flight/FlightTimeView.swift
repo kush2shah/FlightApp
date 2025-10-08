@@ -38,13 +38,15 @@ struct FlightTimeView: View {
             Group {
                 if let actualTime = time.actualTime {
                     Text(actualTime)
-                        .font(.sfRounded(size: 17, weight: .bold))
+                        .font(.sfRounded(size: 16, weight: .bold))
                         .foregroundColor(primaryTimeColor)
+                        .fixedSize(horizontal: true, vertical: false)
                 }
                 else {
                     Text(time.estimatedTime ?? time.scheduledTime ?? "--:--")
-                        .font(.sfRounded(size: 17, weight: .bold))
+                        .font(.sfRounded(size: 16, weight: .bold))
                         .foregroundColor(primaryTimeColor)
+                        .fixedSize(horizontal: true, vertical: false)
                 }
             }
         }
