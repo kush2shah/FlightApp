@@ -33,9 +33,9 @@ struct FlightHeroSection: View {
         if flight.isInProgress {
             if let arrivalDelay = flight.arrivalDelay, arrivalDelay > 900 {
                 let minutes = arrivalDelay / 60
-                return ("En Route • \(minutes)m Late", .orange, "airplane.circle.fill", true)
+                return ("En Route • \(minutes)m Late", .orange, "airplane", true)
             }
-            return ("En Route", .green, "airplane.circle.fill", true)
+            return ("En Route", .green, "airplane", true)
         }
         
         // Pre-departure status

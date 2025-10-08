@@ -22,41 +22,48 @@ struct FlightView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 20) {
+                VStack(spacing: 0) {
                     if let flight = viewModel.currentFlight {
                         // Hero section with flight number and route
                         FlightHeroSection(flight: flight)
-                        
-                        // Route map - prominently positioned
+                            .padding(.horizontal)
+                            .padding(.top)
+
+                        // Route map - full width, no padding
                         FlightRouteMapView(flight: flight)
-                        
-                        // Time and progress information
-                        let flightTimes = viewModel.getFlightTimes()
-                        FlightRouteCard(
-                            flight: flight,
-                            times: flightTimes
-                        )
-                        
-                        // Gate and terminal information
-                        FlightGateTerminalCard(flight: flight)
-                        
-                        // Aircraft and route details
-                        FlightAircraftCard(flight: flight)
-                        
-                        // Airline profile section
-                        airlineProfileSection
-                        
-                        // Status view (if not cancelled)
-                        if !flight.cancelled {
-                            FlightStatusView(flight: flight)
+                            .padding(.top, 20)
+
+                        VStack(spacing: 20) {
+                            // Time and progress information
+                            let flightTimes = viewModel.getFlightTimes()
+                            FlightRouteCard(
+                                flight: flight,
+                                times: flightTimes
+                            )
+
+                            // Gate and terminal information
+                            FlightGateTerminalCard(flight: flight)
+
+                            // Aircraft and route details
+                            FlightAircraftCard(flight: flight)
+
+                            // Airline profile section
+                            airlineProfileSection
+
+                            // Status view (if not cancelled)
+                            if !flight.cancelled {
+                                FlightStatusView(flight: flight)
+                            }
+
+                            // Additional flight details
+                            if !flight.cancelled {
+                                FlightDetailsSection(flight: flight)
+                            }
                         }
-                        
-                        // Additional flight details
-                        if !flight.cancelled {
-                            FlightDetailsSection(flight: flight)
-                        }
+                        .padding()
                     } else if viewModel.isLoading {
                         LoadingView(flightNumber: flightNumber)
+                            .padding()
                     } else if let error = viewModel.error {
                         FlightErrorView(
                             flightNumber: flightNumber,
@@ -68,9 +75,9 @@ struct FlightView: View {
                                 dismiss()
                             }
                         )
+                        .padding()
                     }
                 }
-                .padding()
             }
             .navigationTitle("Flight \(flightNumber)")
             .navigationBarTitleDisplayMode(.inline)

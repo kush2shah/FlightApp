@@ -197,9 +197,8 @@ struct FlightRouteCard: View {
                     
                     // Airplane icon
                     Image(systemName: "airplane")
-                        .font(.caption)
+                        .font(.system(size: 10, weight: .semibold))
                         .foregroundStyle(.blue)
-                        .background(Circle().fill(.white).frame(width: 12, height: 12))
                         .offset(x: max(0, progressWidth(in: geometry) - 6))
                 }
             }

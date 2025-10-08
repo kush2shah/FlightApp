@@ -496,13 +496,13 @@ struct FlightRowCard: View {
 
     var body: some View {
         HStack(spacing: 16) {
-            // Flight number
+            // Flight number and aircraft
             VStack(alignment: .leading, spacing: 4) {
                 Text(flight.ident)
                     .font(.sfRounded(size: 16, weight: .bold))
                     .foregroundColor(.blue)
-                if let operatorIata = flight.operatorIata {
-                    Text(operatorIata)
+                if let aircraftName = AircraftTypeService.shared.getAircraftName(from: flight.aircraftType) {
+                    Text(aircraftName)
                         .font(.sfRounded(size: 12))
                         .foregroundColor(.secondary)
                 }

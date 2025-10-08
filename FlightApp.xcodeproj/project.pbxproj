@@ -290,7 +290,7 @@
 				CODE_SIGN_ENTITLEMENTS = FlightApp/FlightApp.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 3;
 				DEVELOPMENT_ASSET_PATHS = "\"FlightApp/Preview Content\"";
 				DEVELOPMENT_TEAM = D7QM3254U4;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -326,13 +326,15 @@
 		};
 		43AA1E522D4CA278002D5274 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReferenceAnchor = 43AA1E2B2D4CA276002D5274 /* FlightApp */;
+			baseConfigurationReferenceRelativePath = Config.xcconfig;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = FlightApp/FlightApp.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 3;
 				DEVELOPMENT_ASSET_PATHS = "\"FlightApp/Preview Content\"";
 				DEVELOPMENT_TEAM = D7QM3254U4;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -431,6 +433,8 @@
 		};
 		43AA1E542D4CA278002D5274 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReferenceAnchor = 43AA1E2B2D4CA276002D5274 /* FlightApp */;
+			baseConfigurationReferenceRelativePath = Config.xcconfig;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
@@ -575,6 +579,8 @@
 		};
 		43AA1EA82D59CB29002D5274 /* Development */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReferenceAnchor = 43AA1E2B2D4CA276002D5274 /* FlightApp */;
+			baseConfigurationReferenceRelativePath = Config.xcconfig;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
@@ -636,13 +642,15 @@
 		};
 		43AA1EA92D59CB29002D5274 /* Development */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReferenceAnchor = 43AA1E2B2D4CA276002D5274 /* FlightApp */;
+			baseConfigurationReferenceRelativePath = Config.xcconfig;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = FlightApp/FlightApp.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 3;
 				DEVELOPMENT_ASSET_PATHS = "\"FlightApp/Preview Content\"";
 				DEVELOPMENT_TEAM = D7QM3254U4;
 				ENABLE_HARDENED_RUNTIME = YES;

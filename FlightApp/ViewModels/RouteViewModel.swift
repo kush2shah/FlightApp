@@ -31,6 +31,7 @@ class RouteViewModel: ObservableObject {
         let allAircraft = ifrRoutes.flatMap { $0.aircraftTypes }
         let uniqueAircraft = Array(Set(allAircraft))
         return Array(uniqueAircraft.prefix(8)) // Top 8
+            .compactMap { AircraftTypeService.shared.getAircraftName(from: $0) }
     }
 
     // Total flights filed across all routes

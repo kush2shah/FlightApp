@@ -75,9 +75,9 @@ struct FlightStatusView: View {
         // For in-flight
         if flight.isInProgress {
             if let arrivalDelay = flight.arrivalDelay, arrivalDelay > 900 {
-                return ("airplane.circle.fill", .orange, "En Route", "Expected to arrive \(arrivalDelay.formattedDelay()) late")
+                return ("airplane", .orange, "En Route", "Expected to arrive \(arrivalDelay.formattedDelay()) late")
             }
-            return ("airplane.circle.fill", .green, "En Route", "Flight is currently airborne")
+            return ("airplane", .green, "En Route", "Flight is currently airborne")
         }
         
         // For pre-departure
