@@ -13,7 +13,7 @@ struct RouteView: View {
     let destination: String
 
     @StateObject private var viewModel = RouteViewModel()
-    @State private var selectedFlightNumber: String?
+    @State private var selectedFlight: IdentifiableString?
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -39,11 +39,8 @@ struct RouteView: View {
                     }
                 }
             }
-            .sheet(item: Binding(
-                get: { selectedFlightNumber.map { IdentifiableString(value: $0) } },
-                set: { selectedFlightNumber = $0?.value }
-            )) { identifiableFlightNumber in
-                FlightView(flightNumber: identifiableFlightNumber.value, skipFlightSelection: true)
+            .sheet(item: $selectedFlight) { identifiableFlightNumber in
+                FlightView(flightNumber: identifiableFlightNumber.value, faFlightId: identifiableFlightNumber.faFlightId, skipFlightSelection: true)
                     .presentationDragIndicator(.visible)
             }
         }
@@ -207,7 +204,7 @@ struct RouteView: View {
             VStack(spacing: 12) {
                 ForEach(viewModel.currentFlights.prefix(10)) { flight in
                     Button(action: {
-                        selectedFlightNumber = flight.ident
+                        selectedFlight = IdentifiableString(value: flight.ident, faFlightId: flight.faFlightId)
                     }) {
                         FlightRowCard(flight: flight)
                     }

@@ -19,50 +19,25 @@ class FlightViewModel: ObservableObject {
     @Published var airlineError: Error?
     var skipFlightSelection = false
     private var lastSearchedFlightNumber: String?
-    
-    func selectFlight(_ flight: AeroFlight) {
-        print("📱 Selecting flight: \(flight.ident)")
-        self.currentFlight = flight
-        self.showFlightSelection = false
-    }
-    
-    func searchFlight(flightNumber: String) {
-        guard !flightNumber.isEmpty else {
-            self.error = AeroAPIError.invalidURL
-            return
-        }
 
-        // Prevent duplicate searches for the same flight
-        if lastSearchedFlightNumber == flightNumber && (currentFlight != nil || isLoading) {
-            print("⏭️ Skipping duplicate search for: \(flightNumber)")
-            return
-        }
+    func searchFlightForDate(_ date: Date) {
+        guard let flightNumber = lastSearchedFlightNumber else { return }
 
-        lastSearchedFlightNumber = flightNumber
         isLoading = true
         error = nil
-        currentFlight = nil
-        
+
         Task {
             do {
-                print("🔎 Searching for flight: \(flightNumber)")
-                let flights = try await AeroAPIService.shared.getFlightInfo(flightNumber)
+                print("🔎 Re-searching for flight: \(flightNumber) on \(date)")
+                let flights = try await AeroAPIService.shared.getFlightInfo(flightNumber, startDate: date)
                 print("✅ Found \(flights.count) flights")
-                
+
                 await MainActor.run {
                     self.availableFlights = flights
-                    
-                    if flights.count == 1 {
-                        print("📱 Auto-selecting single flight")
-                        self.currentFlight = flights[0]
-                    } else if !flights.isEmpty && !skipFlightSelection {
-                        print("📱 Showing flight selection sheet for \(flights.count) flights")
-                        self.showFlightSelection = true
-                    } else if !flights.isEmpty && skipFlightSelection {
-                        // If we're skipping selection (because we came from search view's selection)
-                        // Just select the first flight
-                        print("📱 Skipping selection and using first flight")
-                        self.currentFlight = flights[0]
+
+                    if !flights.isEmpty {
+                        print("📱 Updated flight selection with new results")
+                        // Keep sheet open with updated results
                     }
                 }
             } catch {
@@ -71,7 +46,70 @@ class FlightViewModel: ObservableObject {
                     self.error = error
                 }
             }
-            
+
+            await MainActor.run {
+                self.isLoading = false
+            }
+        }
+    }
+
+    func selectFlight(_ flight: AeroFlight) {
+        print("📱 Selecting flight: \(flight.ident)")
+        self.currentFlight = flight
+        self.showFlightSelection = false
+    }
+    
+    func searchFlight(flightNumber: String, faFlightId: String? = nil) {
+        guard !flightNumber.isEmpty else {
+            self.error = AeroAPIError.invalidURL
+            return
+        }
+
+        // Prevent duplicate searches only if currently loading the same flight
+        if lastSearchedFlightNumber == flightNumber && isLoading {
+            print("⏭️ Skipping duplicate search (already loading): \(flightNumber)")
+            return
+        }
+
+        // Allow re-search if we don't have a current flight yet
+        lastSearchedFlightNumber = flightNumber
+        isLoading = true
+        error = nil
+        currentFlight = nil
+
+        Task {
+            do {
+                print("🔎 Searching for flight: \(flightNumber)")
+                let flights = try await AeroAPIService.shared.getFlightInfo(flightNumber)
+                print("✅ Found \(flights.count) flights")
+
+                await MainActor.run {
+                    self.availableFlights = flights
+
+                    if !flights.isEmpty {
+                        // If we have a specific fa_flight_id, select that exact flight
+                        if let faFlightId = faFlightId,
+                           let specificFlight = flights.first(where: { $0.faFlightId == faFlightId }) {
+                            print("📱 Auto-selecting specific flight by fa_flight_id: \(faFlightId)")
+                            self.currentFlight = specificFlight
+                        } else if skipFlightSelection {
+                            // Auto-select first flight when opened from another view
+                            print("📱 Auto-selecting flight (skipFlightSelection=true)")
+                            self.currentFlight = flights[0]
+                        } else {
+                            // Show selection sheet to give access to date picker
+                            print("📱 Showing flight selection sheet for \(flights.count) flight(s)")
+                            self.showFlightSelection = true
+                        }
+                    }
+                }
+            } catch {
+                print("❌ Error: \(error)")
+                await MainActor.run {
+                    self.error = error
+                }
+            }
+
             await MainActor.run {
                 self.isLoading = false
             }

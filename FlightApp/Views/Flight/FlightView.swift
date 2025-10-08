@@ -11,11 +11,13 @@ struct FlightView: View {
     @Environment(\.dismiss) private var dismiss
     @StateObject private var viewModel = FlightViewModel()
     let flightNumber: String
+    let faFlightId: String?
     let skipFlightSelection: Bool
-    
+
     // Add an initializer with default parameter
-    init(flightNumber: String, skipFlightSelection: Bool = false) {
+    init(flightNumber: String, faFlightId: String? = nil, skipFlightSelection: Bool = false) {
         self.flightNumber = flightNumber
+        self.faFlightId = faFlightId
         self.skipFlightSelection = skipFlightSelection
     }
     
@@ -85,16 +87,19 @@ struct FlightView: View {
                 FlightSelectionSheet(
                     flights: viewModel.availableFlights,
                     onSelect: viewModel.selectFlight,
-                    onDateChange: nil
+                    onDateChange: { newDate in
+                        viewModel.searchFlightForDate(newDate)
+                    }
                 )
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
+                .presentationBackgroundInteraction(.enabled)
             }
         }
         .onAppear {
             viewModel.skipFlightSelection = skipFlightSelection
-            viewModel.searchFlight(flightNumber: flightNumber)
-            
+            viewModel.searchFlight(flightNumber: flightNumber, faFlightId: faFlightId)
+
             // Check for current flight and fetch airline info if needed
             if viewModel.currentFlight != nil && viewModel.airlineProfile == nil {
                 viewModel.fetchAirlineInfo()
@@ -201,53 +206,20 @@ struct FlightSelectionSheet: View {
         NavigationStack {
             ScrollView {
                 LazyVStack(spacing: 16) {
-                    // Date picker section - revealed when sheet is expanded
-                    VStack(spacing: 12) {
-                        HStack {
-                            Image(systemName: "calendar")
+                    // Hint for single flight results
+                    if flights.count == 1 {
+                        HStack(spacing: 8) {
+                            Image(systemName: "arrow.down")
+                                .font(.caption)
                                 .foregroundColor(.blue)
-                            Text("Search a specific date")
-                                .font(.headline)
+                            Text("Drag down to search other dates")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
                             Spacer()
                         }
-
-                        DatePicker(
-                            "Flight Date",
-                            selection: $selectedDate,
-                            in: Date().addingTimeInterval(-86400 * 365)...Date().addingTimeInterval(86400 * 365),
-                            displayedComponents: [.date]
-                        )
-                        .datePickerStyle(.graphical)
-                        .onChange(of: selectedDate) { oldValue, newValue in
-                            hasChangedDate = true
-                        }
-
-                        if hasChangedDate {
-                            Button(action: {
-                                onDateChange?(selectedDate)
-                                dismiss()
-                            }) {
-                                HStack {
-                                    Image(systemName: "arrow.clockwise")
-                                    Text("Search for \(selectedDate.formatted(date: .abbreviated, time: .omitted))")
-                                }
-                                .font(.headline)
-                                .foregroundColor(.white)
-                                .frame(maxWidth: .infinity)
-                                .padding()
-                                .background(Color.blue)
-                                .cornerRadius(12)
-                            }
-                        }
-                    }
-                    .padding()
-                    .background(Color(.secondarySystemBackground))
-                    .cornerRadius(16)
-                    .padding(.horizontal)
-                    .padding(.top, 8)
-
-                    Divider()
                         .padding(.horizontal)
+                        .padding(.top, 8)
+                    }
 
                     ForEach(groupedFlights, id: \.0) { dateGroup, flights in
                         VStack(alignment: .leading, spacing: 12) {
@@ -276,6 +248,78 @@ struct FlightSelectionSheet: View {
                             }
                         }
                     }
+
+                    // Visual separator with hint
+                    VStack(spacing: 8) {
+                        Divider()
+                            .padding(.horizontal)
+
+                        HStack(spacing: 6) {
+                            Image(systemName: "chevron.compact.down")
+                                .font(.caption)
+                                .foregroundColor(.blue)
+                            Text("Expand for date picker")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        .padding(.bottom, 8)
+                    }
+
+                    // Date picker section - revealed when sheet is expanded
+                    VStack(spacing: 16) {
+                        HStack {
+                            Image(systemName: "calendar")
+                                .font(.title3)
+                                .foregroundColor(.blue)
+                            Text("Search Specific Date")
+                                .font(.headline)
+                            Spacer()
+                        }
+
+                        DatePicker(
+                            "Flight Date",
+                            selection: $selectedDate,
+                            in: Date().addingTimeInterval(-86400 * 10)...Date().addingTimeInterval(86400 * 2),
+                            displayedComponents: [.date]
+                        )
+                        .datePickerStyle(.graphical)
+                        .onChange(of: selectedDate) { oldValue, newValue in
+                            hasChangedDate = true
+                        }
+
+                        if hasChangedDate {
+                            Button(action: {
+                                onDateChange?(selectedDate)
+                            }) {
+                                HStack {
+                                    Image(systemName: "arrow.clockwise")
+                                    Text("Search for \(selectedDate.formatted(date: .abbreviated, time: .omitted))")
+                                }
+                                .font(.headline)
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                                .background(
+                                    LinearGradient(
+                                        colors: [Color.blue, Color.blue.opacity(0.8)],
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    )
+                                )
+                                .cornerRadius(12)
+                                .shadow(color: Color.blue.opacity(0.3), radius: 8, x: 0, y: 4)
+                            }
+                        }
+
+                        Text("Search up to 10 days in the past or 2 days in the future")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                    }
+                    .padding(20)
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                    .padding(.horizontal)
+                    .padding(.bottom, 8)
                 }
                 .padding()
             }

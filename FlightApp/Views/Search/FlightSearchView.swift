@@ -114,7 +114,7 @@ struct FlightSearchView: View {
                 FlightSelectionSheet(
                     flights: availableFlights,
                     onSelect: { selectedFlight in
-                        selectedFlightNumber = IdentifiableString(value: selectedFlight.ident)
+                        selectedFlightNumber = IdentifiableString(value: selectedFlight.ident, faFlightId: selectedFlight.faFlightId)
                         addToRecentSearches()
                         isSearchFocused = false
                     },
@@ -125,9 +125,10 @@ struct FlightSearchView: View {
                 )
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
+                .presentationBackgroundInteraction(.enabled)
             }
             .sheet(item: $selectedFlightNumber) { identifiableFlightNumber in
-                FlightView(flightNumber: identifiableFlightNumber.value, skipFlightSelection: true)
+                FlightView(flightNumber: identifiableFlightNumber.value, faFlightId: identifiableFlightNumber.faFlightId, skipFlightSelection: true)
                     .presentationDragIndicator(.visible)
             }
             .sheet(item: $selectedRoute) { route in
@@ -489,13 +490,8 @@ struct FlightSearchView: View {
                 await MainActor.run {
                     availableFlights = flights
 
-                    if flights.count == 1 {
-                        // If only one flight, directly select it without showing selection sheet
-                        let flight = flights[0]
-                        selectedFlightNumber = IdentifiableString(value: flight.ident)
-                        recentSearchStore.addSearch(flightNumber)
-                    } else if !flights.isEmpty {
-                        // If multiple flights, show selection sheet
+                    if !flights.isEmpty {
+                        // Show selection sheet for all cases to allow date picker access
                         showFlightSelectionSheet = true
                     }
 
@@ -524,13 +520,13 @@ struct FlightSearchView: View {
     }
     
     private func selectRoute(_ route: PopularRoute) {
-        selectedFlightNumber = IdentifiableString(value: route.flightNumber)
+        selectedFlightNumber = IdentifiableString(value: route.flightNumber, faFlightId: nil)
         addToRecentSearches()
         isSearchFocused = false
     }
-    
+
     private func selectRecentSearch(_ search: RecentSearch) {
-        selectedFlightNumber = IdentifiableString(value: search.route)
+        selectedFlightNumber = IdentifiableString(value: search.route, faFlightId: nil)
         addToRecentSearches()
         isSearchFocused = false
     }
@@ -544,6 +540,7 @@ struct FlightSearchView: View {
 struct IdentifiableString: Identifiable {
     let id = UUID()
     let value: String
+    let faFlightId: String?
 }
 
 struct RouteIdentifier: Identifiable {
