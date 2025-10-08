@@ -48,25 +48,25 @@ class AeroAPIService {
         return ""
     }
     
-    func getFlightInfo(_ flightNumber: String) async throws -> [AeroFlight] {
+    func getFlightInfo(_ flightNumber: String, startDate: Date? = nil) async throws -> [AeroFlight] {
         // Clean the flight number
         let cleanedNumber = flightNumber.uppercased().trimmingCharacters(in: .whitespacesAndNewlines)
-        
+
         // Construct URL for the specific flight endpoint
         guard var urlComponents = URLComponents(string: "\(baseURL)/flights/\(cleanedNumber)") else {
             throw AeroAPIError.invalidURL
         }
-        
-        // Add parameters for recent flights (today and upcoming)
+
+        // Add parameters for recent flights (today and upcoming, or specific date)
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
-        let today = formatter.string(from: Date())
-        
-        // Get flights from today onwards
+        let searchDate = formatter.string(from: startDate ?? Date())
+
+        // Get flights from specified date onwards
         urlComponents.queryItems = [
             URLQueryItem(name: "ident_type", value: "designator"),
             URLQueryItem(name: "max_pages", value: "1"),
-            URLQueryItem(name: "start", value: today)
+            URLQueryItem(name: "start", value: searchDate)
         ]
         
         guard let url = urlComponents.url else {

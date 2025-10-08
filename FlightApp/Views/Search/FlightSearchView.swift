@@ -17,6 +17,7 @@ struct FlightSearchView: View {
     @State private var searchError: String? = nil
     @State private var showErrorAlert = false
     @State private var showSettings = false
+    @State private var lastSearchedFlightNumber: String = ""
     @FocusState private var isSearchFocused: Bool
 
     @StateObject private var recentSearchStore = RecentSearchStore()
@@ -116,6 +117,10 @@ struct FlightSearchView: View {
                         selectedFlightNumber = IdentifiableString(value: selectedFlight.ident)
                         addToRecentSearches()
                         isSearchFocused = false
+                    },
+                    onDateChange: { newDate in
+                        // Re-search with the selected date
+                        searchByFlightNumber(lastSearchedFlightNumber, date: newDate)
                     }
                 )
                 .presentationDetents([.medium, .large])
@@ -472,11 +477,14 @@ struct FlightSearchView: View {
         isSearchFocused = false
     }
 
-    private func searchByFlightNumber(_ flightNumber: String) {
+    private func searchByFlightNumber(_ flightNumber: String, date: Date? = nil) {
+        // Store the flight number for date-based re-searches
+        lastSearchedFlightNumber = flightNumber
+
         // Use AeroAPIService to fetch flights
         Task {
             do {
-                let flights = try await AeroAPIService.shared.getFlightInfo(flightNumber)
+                let flights = try await AeroAPIService.shared.getFlightInfo(flightNumber, startDate: date)
 
                 await MainActor.run {
                     availableFlights = flights

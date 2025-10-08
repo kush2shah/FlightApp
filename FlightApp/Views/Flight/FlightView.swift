@@ -84,7 +84,8 @@ struct FlightView: View {
             .sheet(isPresented: $viewModel.showFlightSelection) {
                 FlightSelectionSheet(
                     flights: viewModel.availableFlights,
-                    onSelect: viewModel.selectFlight
+                    onSelect: viewModel.selectFlight,
+                    onDateChange: nil
                 )
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
@@ -158,7 +159,11 @@ struct FlightSelectionSheet: View {
     @Environment(\.dismiss) var dismiss
     let flights: [AeroFlight]
     let onSelect: (AeroFlight) -> Void
-    
+    let onDateChange: ((Date) -> Void)?
+
+    @State private var selectedDate = Date()
+    @State private var hasChangedDate = false
+
     private var groupedFlights: [(String, [AeroFlight])] {
         let sorted = flights.sorted { first, second in
             let firstDate = first.scheduledOut.flatMap { ISO8601DateFormatter().date(from: $0) } ?? .distantFuture
@@ -196,6 +201,54 @@ struct FlightSelectionSheet: View {
         NavigationStack {
             ScrollView {
                 LazyVStack(spacing: 16) {
+                    // Date picker section - revealed when sheet is expanded
+                    VStack(spacing: 12) {
+                        HStack {
+                            Image(systemName: "calendar")
+                                .foregroundColor(.blue)
+                            Text("Search a specific date")
+                                .font(.headline)
+                            Spacer()
+                        }
+
+                        DatePicker(
+                            "Flight Date",
+                            selection: $selectedDate,
+                            in: Date().addingTimeInterval(-86400 * 365)...Date().addingTimeInterval(86400 * 365),
+                            displayedComponents: [.date]
+                        )
+                        .datePickerStyle(.graphical)
+                        .onChange(of: selectedDate) { oldValue, newValue in
+                            hasChangedDate = true
+                        }
+
+                        if hasChangedDate {
+                            Button(action: {
+                                onDateChange?(selectedDate)
+                                dismiss()
+                            }) {
+                                HStack {
+                                    Image(systemName: "arrow.clockwise")
+                                    Text("Search for \(selectedDate.formatted(date: .abbreviated, time: .omitted))")
+                                }
+                                .font(.headline)
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                                .background(Color.blue)
+                                .cornerRadius(12)
+                            }
+                        }
+                    }
+                    .padding()
+                    .background(Color(.secondarySystemBackground))
+                    .cornerRadius(16)
+                    .padding(.horizontal)
+                    .padding(.top, 8)
+
+                    Divider()
+                        .padding(.horizontal)
+
                     ForEach(groupedFlights, id: \.0) { dateGroup, flights in
                         VStack(alignment: .leading, spacing: 12) {
                             // Date section header
