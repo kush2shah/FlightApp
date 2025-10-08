@@ -18,6 +18,7 @@ class FlightViewModel: ObservableObject {
     @Published var isLoadingAirline = false
     @Published var airlineError: Error?
     var skipFlightSelection = false
+    private var lastSearchedFlightNumber: String?
     
     func selectFlight(_ flight: AeroFlight) {
         print("📱 Selecting flight: \(flight.ident)")
@@ -30,7 +31,14 @@ class FlightViewModel: ObservableObject {
             self.error = AeroAPIError.invalidURL
             return
         }
-        
+
+        // Prevent duplicate searches for the same flight
+        if lastSearchedFlightNumber == flightNumber && (currentFlight != nil || isLoading) {
+            print("⏭️ Skipping duplicate search for: \(flightNumber)")
+            return
+        }
+
+        lastSearchedFlightNumber = flightNumber
         isLoading = true
         error = nil
         currentFlight = nil
