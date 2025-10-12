@@ -49,8 +49,10 @@ class AeroAPIService {
     }
     
     func getFlightInfo(_ flightNumber: String, startDate: Date? = nil) async throws -> [AeroFlight] {
-        // Clean the flight number
-        let cleanedNumber = flightNumber.uppercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        // Clean the flight number - remove all spaces and trim whitespace
+        let cleanedNumber = flightNumber.uppercased()
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: " ", with: "")
 
         // Construct URL for the specific flight endpoint
         guard var urlComponents = URLComponents(string: "\(baseURL)/flights/\(cleanedNumber)") else {
@@ -354,7 +356,7 @@ class AeroAPIService {
 
     // The search strategy methods remain the same
     private func createPreciseIdentSearch(_ flightNumber: String) -> URLComponents? {
-        var urlComponents = URLComponents(string: "\(baseURL)/flights/\(flightNumber)")
+        let urlComponents = URLComponents(string: "\(baseURL)/flights/\(flightNumber)")
         return urlComponents
     }
 

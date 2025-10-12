@@ -103,9 +103,9 @@ class SearchInputParser {
 
     /// Validate if string looks like a flight number
     private func isValidFlightNumber(_ input: String) -> Bool {
-        // Flight number pattern: 2-3 letter airline code + 1-4 digit number
-        // Examples: AA1, UA60, BA175, DL1234
-        let pattern = "^[A-Z]{2,3}[0-9]{1,4}$"
+        // Flight number pattern: 2-3 letter airline code + optional space + 1-4 digit number
+        // Examples: AA1, UA60, BA175, DL1234, AA 1, UA 60
+        let pattern = "^[A-Z]{2,3}\\s?[0-9]{1,4}$"
         let regex = try? NSRegularExpression(pattern: pattern)
         let range = NSRange(input.startIndex..., in: input)
         return regex?.firstMatch(in: input, range: range) != nil
