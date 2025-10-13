@@ -57,18 +57,8 @@ struct FlightSearchView_Redesigned: View {
                     .padding(.horizontal, 20)
                 }
 
-                // Bottom floating search bar (liquid glass)
-                VStack {
-                    Spacer()
-                    bottomSearchBar
-                        .padding(.horizontal, 20)
-                        .padding(.bottom, 20)
-                }
-
-                // Expanded search overlay
-                if isSearchExpanded {
-                    expandedSearchOverlay
-                }
+                // Adaptive search bar (liquid glass)
+                adaptiveSearchBar
             }
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
@@ -91,10 +81,27 @@ struct FlightSearchView_Redesigned: View {
                 FlightSelectionSheet(
                     flights: availableFlights,
                     onSelect: { selectedFlight in
-                        let flightData = RecentFlightData.from(flight: selectedFlight)
                         selectedFlightNumber = IdentifiableString(value: selectedFlight.ident, faFlightId: selectedFlight.faFlightId)
-                        addToRecentSearches(flightData: flightData)
                         isSearchFocused = false
+
+                        // Fetch airline name and add to recent searches
+                        Task {
+                            var airlineName: String? = nil
+                            if let airlineCode = selectedFlight.operatorIata ?? selectedFlight.operatorIcao {
+                                do {
+                                    let airlineProfile = try await AirlineService.shared.getAirlineInfo(code: airlineCode)
+                                    airlineName = airlineProfile.name
+                                } catch {
+                                    print("⚠️ Failed to fetch airline name: \(error)")
+                                }
+                            }
+
+                            let flightData = RecentFlightData.from(flight: selectedFlight, airlineName: airlineName)
+                            print("🔵 Created flight data: \(flightData.flightNumber), airline: \(flightData.airlineName ?? "nil")")
+                            await MainActor.run {
+                                addToRecentSearches(flightData: flightData)
+                            }
+                        }
                     },
                     onDateChange: { newDate in
                         searchByFlightNumber(lastSearchedFlightNumber, date: newDate)
@@ -118,6 +125,8 @@ struct FlightSearchView_Redesigned: View {
                     }
                     .onDisappear {
                         haptics.sheetClosed()
+                        // Update recent search with fresh flight data when view closes
+                        updateRecentSearchFromFlightView(flightNumber: identifiableFlightNumber.value)
                     }
             }
             .sheet(item: $selectedRoute) { route in
@@ -137,87 +146,76 @@ struct FlightSearchView_Redesigned: View {
         }
     }
 
-    // MARK: - Bottom Search Bar
+    // MARK: - Adaptive Search Bar (Liquid Glass)
 
-    private var bottomSearchBar: some View {
-        Button(action: {
-            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                isSearchExpanded = true
-                haptics.impact(.heavy)
-            }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                isSearchFocused = true
-            }
-        }) {
-            HStack(spacing: 16) {
-                Image(systemName: "magnifyingglass")
-                    .font(.system(size: 20, weight: .medium))
-                    .foregroundColor(.secondary)
-
-                Text("Search flight number or route...")
-                    .font(.sfRounded(size: 17))
-                    .foregroundColor(.secondary)
-
-                Spacer()
-            }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 16)
-            .glassEffect(.regular, in: .rect(cornerRadius: 16))
-            .shadow(color: Color.black.opacity(0.15), radius: 20, x: 0, y: 10)
-        }
-        .buttonStyle(PlainButtonStyle())
-        .matchedGeometryEffect(id: "searchBar", in: searchAnimation)
-    }
-
-    // MARK: - Expanded Search Overlay
-
-    private var expandedSearchOverlay: some View {
+    private var adaptiveSearchBar: some View {
         ZStack {
-            // Backdrop
-            Color.black.opacity(0.4)
-                .ignoresSafeArea()
-                .onTapGesture {
-                    dismissSearch()
+            // Backdrop for expanded state
+            if isSearchExpanded {
+                Color.black.opacity(0.2)
+                    .ignoresSafeArea()
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        dismissSearch()
+                    }
+                    .transition(.opacity)
+            }
+
+            // Single morphing search bar
+            VStack {
+                if isSearchExpanded {
+                    Spacer()
+                        .frame(height: 100)
                 }
 
-            // Expanded search bar
-            VStack {
-                Spacer()
-                    .frame(height: 100)
+                if !isSearchExpanded {
+                    Spacer()
+                }
 
+                // Single unified search bar content
                 VStack(spacing: 0) {
                     HStack(spacing: 16) {
                         Image(systemName: "magnifyingglass")
-                            .font(.system(size: 22, weight: .medium))
+                            .font(.system(size: isSearchExpanded ? 22 : 20, weight: .medium))
                             .foregroundColor(.secondary)
 
-                        TextField("AA1 or JFK LHR...", text: $searchText)
-                            .font(.sfRounded(size: 20))
-                            .textInputAutocapitalization(.characters)
-                            .autocorrectionDisabled()
-                            .focused($isSearchFocused)
-                            .onSubmit(searchFlight)
-                            .disabled(isSearching)
+                        if isSearchExpanded {
+                            TextField("AA1 or JFK LHR...", text: $searchText)
+                                .font(.sfRounded(size: 20))
+                                .textInputAutocapitalization(.characters)
+                                .autocorrectionDisabled()
+                                .focused($isSearchFocused)
+                                .onSubmit(searchFlight)
+                                .disabled(isSearching)
+                        } else {
+                            Text("Search flight number or route...")
+                                .font(.sfRounded(size: 17))
+                                .foregroundColor(.secondary)
+                        }
 
-                        if isSearching {
-                            ProgressView()
-                                .scaleEffect(1.2)
-                        } else if !searchText.isEmpty {
-                            Button(action: {
-                                haptics.searchCleared()
-                                searchText = ""
-                            }) {
-                                Image(systemName: "xmark.circle.fill")
-                                    .font(.system(size: 20))
-                                    .foregroundColor(.secondary)
+                        Spacer()
+
+                        if isSearchExpanded {
+                            if isSearching {
+                                ProgressView()
+                                    .scaleEffect(1.2)
+                            } else if !searchText.isEmpty {
+                                Button(action: {
+                                    haptics.searchCleared()
+                                    searchText = ""
+                                }) {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .font(.system(size: 20))
+                                        .foregroundColor(.secondary)
+                                }
                             }
                         }
                     }
-                    .padding(.horizontal, 24)
-                    .padding(.vertical, 20)
+                    .padding(.horizontal, isSearchExpanded ? 24 : 20)
+                    .padding(.vertical, isSearchExpanded ? 20 : 16)
 
-                    // Search hints
-                    if searchText.isEmpty {
+                    // Search hints (only when expanded)
+                    if isSearchExpanded && searchText.isEmpty {
                         VStack(spacing: 12) {
                             Divider()
 
@@ -228,17 +226,39 @@ struct FlightSearchView_Redesigned: View {
                             .padding(.horizontal, 20)
                             .padding(.bottom, 16)
                         }
+                        .transition(.opacity.combined(with: .move(edge: .top)))
                     }
                 }
-                .glassEffect(.regular, in: .rect(cornerRadius: 20))
-                .shadow(color: Color.black.opacity(0.2), radius: 30, x: 0, y: 15)
+                .glassEffect(.regular, in: .rect(cornerRadius: isSearchExpanded ? 20 : 25))
+                .shadow(
+                    color: Color.black.opacity(isSearchExpanded ? 0.2 : 0.15),
+                    radius: isSearchExpanded ? 30 : 20,
+                    x: 0,
+                    y: isSearchExpanded ? 15 : 10
+                )
                 .padding(.horizontal, 20)
-                .matchedGeometryEffect(id: "searchBar", in: searchAnimation)
+                .padding(.bottom, isSearchExpanded ? 0 : 20)
+                .glassEffectID("searchBar", in: searchAnimation)
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    if !isSearchExpanded {
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                            isSearchExpanded = true
+                            haptics.impact(.heavy)
+                        }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                            isSearchFocused = true
+                        }
+                    }
+                }
 
-                Spacer()
+                if !isSearchExpanded {
+                    // No spacer needed, bar stays at bottom
+                } else {
+                    Spacer()
+                }
             }
         }
-        .transition(.opacity)
     }
 
     private func searchHintButton(_ text: String, icon: String) -> some View {
@@ -312,6 +332,7 @@ struct FlightSearchView_Redesigned: View {
                     .foregroundColor(.primary)
                 Spacer()
             }
+            .padding(.horizontal, 20)
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 16) {
@@ -323,8 +344,10 @@ struct FlightSearchView_Redesigned: View {
                             }
                     }
                 }
+                .padding(.horizontal, 20)
             }
         }
+        .padding(.horizontal, -20) // Counteract parent padding
     }
 
     // MARK: - Helper Functions
@@ -410,6 +433,34 @@ struct FlightSearchView_Redesigned: View {
     private func addToRecentSearches(flightData: RecentFlightData) {
         guard let flightNumber = selectedFlightNumber?.value else { return }
         recentSearchStore.addSearch(flightNumber, type: .flightNumber, flightData: flightData)
+    }
+
+    private func updateRecentSearchFromFlightView(flightNumber: String) {
+        // Fetch fresh flight data and update the recent search
+        Task {
+            do {
+                let flights = try await AeroAPIService.shared.getFlightInfo(flightNumber)
+                if let firstFlight = flights.first {
+                    // Fetch airline name
+                    var airlineName: String? = nil
+                    if let airlineCode = firstFlight.operatorIata ?? firstFlight.operatorIcao {
+                        do {
+                            let airlineProfile = try await AirlineService.shared.getAirlineInfo(code: airlineCode)
+                            airlineName = airlineProfile.name
+                        } catch {
+                            print("⚠️ Failed to fetch airline name: \(error)")
+                        }
+                    }
+
+                    let flightData = RecentFlightData.from(flight: firstFlight, airlineName: airlineName)
+                    await MainActor.run {
+                        recentSearchStore.addSearch(flightNumber, type: .flightNumber, flightData: flightData)
+                    }
+                }
+            } catch {
+                print("Failed to update recent search with flight data: \(error)")
+            }
+        }
     }
 }
 
@@ -545,17 +596,48 @@ private struct RichFlightCard: View {
             return ("Unknown", .gray)
         }
 
+        // Check for cancelled
         if status.contains("cancel") {
             return ("Cancelled", .red)
-        } else if status.contains("active") || status.contains("enroute") {
-            return ("In Flight", .green)
-        } else if status.contains("landed") || status.contains("arrived") {
-            return ("Landed", .blue)
-        } else if status.contains("scheduled") {
-            return ("Scheduled", .orange)
-        } else {
-            return ("Unknown", .gray)
         }
+
+        // Check for arrived/landed
+        if status.contains("arrived") || status.contains("landed") || status.contains("gate arrival") {
+            return ("Arrived", .blue)
+        }
+
+        // Check for en route/active/in flight
+        if status.contains("active") || status.contains("enroute") || status.contains("en route") || status.contains("airborne") {
+            return ("En Route", .green)
+        }
+
+        // Check for scheduled
+        if status.contains("scheduled") {
+            return ("Scheduled", .orange)
+        }
+
+        // Check for filed (pre-departure)
+        if status.contains("filed") {
+            return ("Filed", .purple)
+        }
+
+        // Check for departed (just took off)
+        if status.contains("departed") || status.contains("gate departure") {
+            return ("Departed", .green)
+        }
+
+        // Check for delayed
+        if status.contains("delayed") {
+            return ("Delayed", .orange)
+        }
+
+        // Check for diverted
+        if status.contains("diverted") {
+            return ("Diverted", .red)
+        }
+
+        // Default for unrecognized statuses
+        return ("Unknown", .gray)
     }
 }
 

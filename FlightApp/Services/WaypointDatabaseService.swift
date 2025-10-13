@@ -213,7 +213,7 @@ class WaypointDatabaseService {
     
     /// Load waypoint data from ARINC 424 file
     func loadFromARINC424File(at path: String) {
-        guard let content = try? String(contentsOfFile: path) else {
+        guard let content = try? String(contentsOfFile: path, encoding: .utf8) else {
             print("Failed to load ARINC 424 file at \(path)")
             return
         }
@@ -236,19 +236,19 @@ class WaypointDatabaseService {
     private func loadCSVWaypoints() {
         // Try to load the comprehensive navigation database first
         if let path = Bundle.main.path(forResource: "complete_navigation_database", ofType: "csv"),
-           let content = try? String(contentsOfFile: path) {
+           let content = try? String(contentsOfFile: path, encoding: .utf8) {
             print("📍 Loading from comprehensive navigation database...")
             parseCSVContent(content, source: "ARINC424")
             return
         }
-        
+
         // Fallback to bundled international waypoints
         guard let path = Bundle.main.path(forResource: "international_waypoints", ofType: "csv") else {
             print("⚠️ No waypoint database found in bundle")
             return
         }
-        
-        guard let content = try? String(contentsOfFile: path) else {
+
+        guard let content = try? String(contentsOfFile: path, encoding: .utf8) else {
             print("⚠️ Failed to read international_waypoints.csv")
             return
         }

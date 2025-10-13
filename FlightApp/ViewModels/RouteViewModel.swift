@@ -49,12 +49,11 @@ class RouteViewModel: ObservableObject {
         error = nil
 
         // Load data in parallel
-        async let routeInfoTask = loadRouteInfo(origin: origin, destination: destination)
-        async let flightsTask = loadFlights(origin: origin, destination: destination)
-        async let awardsTask = loadAwards(origin: origin, destination: destination)
-
-        // Wait for all to complete
-        _ = await (routeInfoTask, flightsTask, awardsTask)
+        await withTaskGroup(of: Void.self) { group in
+            group.addTask { await self.loadRouteInfo(origin: origin, destination: destination) }
+            group.addTask { await self.loadFlights(origin: origin, destination: destination) }
+            group.addTask { await self.loadAwards(origin: origin, destination: destination) }
+        }
 
         isLoading = false
     }

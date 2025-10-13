@@ -43,8 +43,8 @@ struct AirlineProfileView: View {
             // Main content with airline information
             content
         }
-        .cornerRadius(16)
-        .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
+        .cornerRadius(20)
+        .shadow(color: Color.black.opacity(0.1), radius: 15, x: 0, y: 5)
     }
     
     private var header: some View {
@@ -108,7 +108,7 @@ struct AirlineProfileView: View {
             }
         }
         .padding()
-        .background(Color(.systemBackground))
+        .background(.regularMaterial)
     }
     
     private var codeDisplay: some View {

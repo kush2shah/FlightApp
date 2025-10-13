@@ -23,9 +23,15 @@ struct FlightView: View {
     
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(spacing: 0) {
-                    if let flight = viewModel.currentFlight {
+            ZStack {
+                // Liquid glass background layer
+                Color.clear
+                    .background(.ultraThinMaterial)
+                    .ignoresSafeArea()
+
+                ScrollView {
+                    VStack(spacing: 0) {
+                        if let flight = viewModel.currentFlight {
                         // Hero section with flight number and route
                         FlightHeroSection(flight: flight)
                             .padding(.horizontal)
@@ -80,6 +86,7 @@ struct FlightView: View {
                         .padding()
                     }
                 }
+                }
             }
             .navigationTitle("Flight \(flightNumber)")
             .navigationBarTitleDisplayMode(.inline)
@@ -106,7 +113,7 @@ struct FlightView: View {
             }
         }
         // Use a different approach to respond to flight changes
-        .onChange(of: viewModel.currentFlight?.faFlightId) { _ in
+        .onChange(of: viewModel.currentFlight?.faFlightId) { oldValue, newValue in
             if viewModel.currentFlight != nil {
                 viewModel.fetchAirlineInfo()
             }
@@ -317,7 +324,8 @@ struct FlightSelectionSheet: View {
                             .multilineTextAlignment(.center)
                     }
                     .padding(20)
-                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                    .glassEffect(.regular, in: .rect(cornerRadius: 20))
+                    .shadow(color: Color.black.opacity(0.1), radius: 15, x: 0, y: 5)
                     .padding(.horizontal)
                     .padding(.bottom, 8)
                 }
@@ -416,8 +424,8 @@ struct EnhancedFlightSelectionCard: View {
             }
         }
         .padding()
-        .background(Color(.systemGray6))
-        .cornerRadius(12)
+        .glassEffect(.regular, in: .rect(cornerRadius: 16))
+        .shadow(color: Color.black.opacity(0.08), radius: 10, x: 0, y: 4)
     }
 }
 

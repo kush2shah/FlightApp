@@ -59,9 +59,8 @@ struct GateInformationCard: View {
             }
         }
         .padding()
-        .background(Color(.systemBackground))
-        .cornerRadius(16)
-        .shadow(radius: 5)
+        .glassEffect(.regular, in: .rect(cornerRadius: 20))
+        .shadow(color: Color.black.opacity(0.1), radius: 15, x: 0, y: 5)
     }
 }
 
@@ -87,9 +86,8 @@ struct FlightInformationCard: View {
             }
         }
         .padding()
-        .background(Color(.systemBackground))
-        .cornerRadius(16)
-        .shadow(radius: 5)
+        .glassEffect(.regular, in: .rect(cornerRadius: 20))
+        .shadow(color: Color.black.opacity(0.1), radius: 15, x: 0, y: 5)
     }
 }
 

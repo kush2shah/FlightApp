@@ -75,9 +75,8 @@ struct FlightGateTerminalCard: View {
                 }
             }
             .padding()
-            .background(Color(.systemBackground))
-            .cornerRadius(16)
-            .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 2)
+            .glassEffect(.regular, in: .rect(cornerRadius: 20))
+            .shadow(color: Color.black.opacity(0.1), radius: 15, x: 0, y: 5)
         }
     }
 }

@@ -108,11 +108,6 @@ struct AirlineLogoView: View {
                     .resizable()
                     .aspectRatio(contentMode: .fit)
                     .frame(width: size, height: size)
-                    .clipShape(Circle())
-                    .overlay(
-                        Circle()
-                            .stroke(Color(.separator).opacity(0.2), lineWidth: 1)
-                    )
             } else if let code = iataCode {
                 AirlineLogoService.fallbackLogoView(iataCode: code, size: size)
             } else {

@@ -27,7 +27,25 @@ struct RecentFlightData: Codable, Hashable {
         return RecentFlightData(
             flightNumber: flight.ident,
             airlineIATA: flight.operatorIata,
-            airlineName: flight.operator_,
+            airlineName: nil,  // Will be fetched asynchronously
+            originCode: flight.origin.codeIata ?? flight.origin.codeIcao ?? "",
+            originCity: flight.origin.city,
+            destinationCode: flight.destination.codeIata ?? flight.destination.codeIcao ?? "",
+            destinationCity: flight.destination.city,
+            scheduledDeparture: flight.scheduledOut.flatMap { ISO8601DateFormatter().date(from: $0) },
+            scheduledArrival: flight.scheduledIn.flatMap { ISO8601DateFormatter().date(from: $0) },
+            status: flight.status,
+            progress: flight.progressPercent.flatMap { Double($0) / 100.0 },
+            lastUpdated: Date()
+        )
+    }
+
+    /// Create from AeroFlight with airline name fetched from API
+    static func from(flight: AeroFlight, airlineName: String?) -> RecentFlightData {
+        return RecentFlightData(
+            flightNumber: flight.ident,
+            airlineIATA: flight.operatorIata,
+            airlineName: airlineName,
             originCode: flight.origin.codeIata ?? flight.origin.codeIcao ?? "",
             originCity: flight.origin.city,
             destinationCode: flight.destination.codeIata ?? flight.destination.codeIcao ?? "",
@@ -162,6 +180,11 @@ class RecentSearchStore: ObservableObject {
     }
     
     func addSearch(_ route: String, type: SearchKind = .unknown, flightData: RecentFlightData? = nil) {
+        print("🟢 Adding search: \(route), has flight data: \(flightData != nil)")
+        if let data = flightData {
+            print("🟢 Flight data details - airline: \(data.airlineIATA ?? "nil"), origin: \(data.originCode), dest: \(data.destinationCode)")
+        }
+
         // Prevent duplicate recent searches - but update if flight data is provided
         if let existingIndex = recentSearches.firstIndex(where: { $0.route.lowercased() == route.lowercased() }) {
             // Remove old entry to replace with updated one
