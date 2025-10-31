@@ -9,11 +9,10 @@ import SwiftUI
 
 struct FlightAircraftCard: View {
     let flight: AeroFlight
-    
+
     private var hasAircraftInfo: Bool {
         flight.aircraftType != nil || flight.registration != nil ||
-        flight.filedAltitude != nil || flight.filedAirspeed != nil ||
-        flight.route != nil
+        flight.filedEte != nil || flight.route != nil
     }
     
     var body: some View {
@@ -50,7 +49,7 @@ struct FlightAircraftCard: View {
                             
                             if let registration = flight.registration {
                                 VStack(alignment: .leading, spacing: 2) {
-                                    Text("Registration")
+                                    Text("Tail Number")
                                         .font(.caption2)
                                         .foregroundColor(.secondary)
                                     Text(registration)
@@ -64,39 +63,21 @@ struct FlightAircraftCard: View {
                     }
                 }
                 
-                // Flight parameters
-                if flight.filedAltitude != nil || flight.filedAirspeed != nil || flight.filedEte != nil {
+                // Flight duration (removed technical parameters: altitude, airspeed)
+                if let duration = flight.filedEte {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Flight Parameters")
+                        Text("Flight Duration")
                             .font(.subheadline)
                             .fontWeight(.medium)
                             .foregroundColor(.secondary)
-                        
+
                         HStack(spacing: 16) {
-                            if let altitude = flight.filedAltitude {
-                                ParameterView(
-                                    icon: "arrow.up",
-                                    label: "Altitude",
-                                    value: "\(altitude) ft"
-                                )
-                            }
-                            
-                            if let airspeed = flight.filedAirspeed {
-                                ParameterView(
-                                    icon: "speedometer",
-                                    label: "Speed",
-                                    value: "\(airspeed) kts"
-                                )
-                            }
-                            
-                            if let duration = flight.filedEte {
-                                ParameterView(
-                                    icon: "clock",
-                                    label: "Duration",
-                                    value: formattedDuration(duration)
-                                )
-                            }
-                            
+                            ParameterView(
+                                icon: "clock",
+                                label: "Duration",
+                                value: formattedDuration(duration)
+                            )
+
                             Spacer()
                         }
                     }

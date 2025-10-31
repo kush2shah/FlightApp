@@ -23,6 +23,7 @@ struct FlightSearchView_Redesigned: View {
     @Namespace private var searchAnimation
 
     @StateObject private var recentSearchStore = RecentSearchStore()
+    @State private var refreshTrigger = 0
     private let haptics = HapticManager.shared
 
     var body: some View {
@@ -96,10 +97,22 @@ struct FlightSearchView_Redesigned: View {
                                 }
                             }
 
-                            let flightData = RecentFlightData.from(flight: selectedFlight, airlineName: airlineName)
-                            print("🔵 Created flight data: \(flightData.flightNumber), airline: \(flightData.airlineName ?? "nil")")
+                            // Get the timestamp when this data was actually fetched from the API
+                            let cacheKey = AeroAPICacheService.flightInfoKey(flightNumber: selectedFlight.ident, startDate: nil)
+                            let cacheTimestamp = AeroAPICacheService.shared.getTimestamp(cacheKey)
+
+                            // If no cache timestamp exists, data was just fetched (use current time)
+                            let lastFetchedAt = cacheTimestamp ?? Date()
+
+                            let flightData = RecentFlightData.from(flight: selectedFlight, airlineName: airlineName, lastFetchedAt: lastFetchedAt)
+                            print("🔵 [FlightSelectionSheet] Created flight data: \(flightData.flightNumber)")
+                            print("   Cache key: \(cacheKey)")
+                            print("   Cache timestamp: \(cacheTimestamp?.description ?? "nil")")
+                            print("   Using lastFetchedAt: \(lastFetchedAt.description)")
+                            print("   Age: \(Date().timeIntervalSince(lastFetchedAt))s ago")
                             await MainActor.run {
                                 addToRecentSearches(flightData: flightData)
+                                refreshTrigger += 1
                             }
                         }
                     },
@@ -127,6 +140,8 @@ struct FlightSearchView_Redesigned: View {
                         haptics.sheetClosed()
                         // Update recent search with fresh flight data when view closes
                         updateRecentSearchFromFlightView(flightNumber: identifiableFlightNumber.value)
+                        // Trigger refresh of all flight cards
+                        refreshTrigger += 1
                     }
             }
             .sheet(item: $selectedRoute) { route in
@@ -300,7 +315,7 @@ struct FlightSearchView_Redesigned: View {
             }
 
             ForEach(Array(recentSearchStore.recentSearches.prefix(3).enumerated()), id: \.element.id) { index, search in
-                RichFlightCard(search: search)
+                RichFlightCard(search: search, refreshTrigger: refreshTrigger)
                     .onAppear {
                         haptics.cardAppeared(delay: Double(index) * 0.05)
                     }
@@ -309,6 +324,12 @@ struct FlightSearchView_Redesigned: View {
                         selectRecentSearch(search)
                     }
                     .contextMenu {
+                        Button {
+                            forceRefreshFlight(search.route)
+                        } label: {
+                            Label("Refresh Flight Data", systemImage: "arrow.clockwise")
+                        }
+
                         Button(role: .destructive) {
                             withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                                 haptics.cardDeleted()
@@ -452,9 +473,17 @@ struct FlightSearchView_Redesigned: View {
                         }
                     }
 
-                    let flightData = RecentFlightData.from(flight: firstFlight, airlineName: airlineName)
+                    // Get the timestamp when this data was actually fetched from the API
+                    let cacheKey = AeroAPICacheService.flightInfoKey(flightNumber: flightNumber, startDate: nil)
+                    let cacheTimestamp = AeroAPICacheService.shared.getTimestamp(cacheKey)
+
+                    // If no cache timestamp exists, data was just fetched (use current time)
+                    let lastFetchedAt = cacheTimestamp ?? Date()
+
+                    let flightData = RecentFlightData.from(flight: firstFlight, airlineName: airlineName, lastFetchedAt: lastFetchedAt)
                     await MainActor.run {
                         recentSearchStore.addSearch(flightNumber, type: .flightNumber, flightData: flightData)
+                        refreshTrigger += 1
                     }
                 }
             } catch {
@@ -462,12 +491,28 @@ struct FlightSearchView_Redesigned: View {
             }
         }
     }
+
+    private func forceRefreshFlight(_ flightNumber: String) {
+        // Clear cache for this flight to force fresh fetch
+        let cacheKey = AeroAPICacheService.flightInfoKey(flightNumber: flightNumber, startDate: nil)
+        AeroAPICacheService.shared.remove(cacheKey)
+
+        // Fetch fresh data
+        updateRecentSearchFromFlightView(flightNumber: flightNumber)
+        haptics.impact(.medium)
+    }
 }
 
 // MARK: - Rich Flight Card
 
 private struct RichFlightCard: View {
     let search: RecentSearch
+    let refreshTrigger: Int  // Used to force refresh when parent updates
+
+    private var brandColors: AirlineBrandColors? {
+        guard let data = search.flightData else { return nil }
+        return AirlineColorService.shared.getBrandColors(for: data.airlineIATA)
+    }
 
     var body: some View {
         if let data = search.flightData {
@@ -560,19 +605,26 @@ private struct RichFlightCard: View {
                 HStack {
                     Image(systemName: "clock")
                         .font(.system(size: 11))
-                    Text("Updated \(search.lastUpdatedString)")
+                    Text("Updated \(lastUpdatedString)")
                         .font(.sfRounded(size: 12))
                 }
                 .foregroundColor(.secondary.opacity(0.6))
             }
             .padding(20)
-            .background(Color(.secondarySystemBackground))
-            .cornerRadius(20)
+            .brandedGlassEffect(colors: brandColors, cornerRadius: 20, intensity: 0.18)
             .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 4)
+            .id("\(search.id)-\(refreshTrigger)")  // Force refresh when trigger changes
         } else {
             // Fallback for searches without flight data
-            SimpleFlightCard(search: search)
+            SimpleFlightCard(search: search, refreshTrigger: refreshTrigger)
         }
+    }
+
+    private var lastUpdatedString: String {
+        guard let data = search.flightData else { return "" }
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .abbreviated
+        return formatter.localizedString(for: data.lastUpdated, relativeTo: Date())
     }
 
     private func statusBadge(status: String?) -> some View {
@@ -645,6 +697,7 @@ private struct RichFlightCard: View {
 
 private struct SimpleFlightCard: View {
     let search: RecentSearch
+    let refreshTrigger: Int  // Used to force refresh when parent updates
 
     var body: some View {
         let info = search.displayInfo
@@ -662,7 +715,7 @@ private struct SimpleFlightCard: View {
                     .font(.sfRounded(size: 18, weight: .semibold))
                     .foregroundColor(.primary)
 
-                Text("Searched \(search.relativeTimeString)")
+                Text("Searched \(relativeTimeString)")
                     .font(.sfRounded(size: 13))
                     .foregroundColor(.secondary)
             }
@@ -672,6 +725,13 @@ private struct SimpleFlightCard: View {
         .padding(16)
         .background(Color(.secondarySystemBackground))
         .cornerRadius(16)
+        .id("\(search.id)-\(refreshTrigger)")  // Force refresh when trigger changes
+    }
+
+    private var relativeTimeString: String {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .short
+        return formatter.localizedString(for: search.timestamp, relativeTo: Date())
     }
 }
 
@@ -712,6 +772,20 @@ private struct DiscoverRouteCard: View {
         let letters = flightNumber.prefix(while: { $0.isLetter })
         return String(letters)
     }
+}
+
+// MARK: - Helper Types
+
+struct IdentifiableString: Identifiable {
+    let id = UUID()
+    let value: String
+    let faFlightId: String?
+}
+
+struct RouteIdentifier: Identifiable {
+    let id = UUID()
+    let origin: String
+    let destination: String
 }
 
 #Preview {

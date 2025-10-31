@@ -57,19 +57,41 @@ struct FlightHeroSection: View {
         return ("On Time", .green, "checkmark.circle", false)
     }
     
+    private var airlineCode: String? {
+        flight.operatorIata ?? flight.operatorIcao
+    }
+
+    private var brandColors: AirlineBrandColors? {
+        AirlineColorService.shared.getBrandColors(for: airlineCode)
+    }
+
+    @State private var airlineName: String?
+
     var body: some View {
         VStack(spacing: 16) {
-            // Flight identifier with date
-            HStack {
+            // Flight identifier with date and airline logo
+            HStack(alignment: .top, spacing: 16) {
+                // Airline logo
+                if let code = airlineCode {
+                    AirlineLogoView(iataCode: code, size: 64)
+                }
+
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(flight.operatorIata ?? flight.operator_ ?? "")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    
+                    // Airline name (if available)
+                    if let name = airlineName {
+                        Text(name)
+                            .font(.sfRounded(size: 13, weight: .medium))
+                            .foregroundColor(.secondary)
+                    } else {
+                        Text(flight.operatorIata ?? flight.operator_ ?? "")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+
                     Text(flight.flightNumber ?? flight.ident)
                         .font(.largeTitle)
                         .fontWeight(.bold)
-                    
+
                     // Subtle date display
                     if let scheduledOut = flight.scheduledOut,
                        let date = ISO8601DateFormatter().date(from: scheduledOut),
@@ -79,24 +101,32 @@ struct FlightHeroSection: View {
                             .foregroundColor(.secondary)
                     }
                 }
-                
+
                 Spacer()
-                
-                // Status badge
+
+                // Status badge with strong contrast
                 VStack(alignment: .trailing, spacing: 4) {
                     HStack(spacing: 6) {
                         Image(systemName: statusInfo.icon)
                             .font(.caption)
                         Text(statusInfo.text)
                             .font(.caption)
-                            .fontWeight(.medium)
+                            .fontWeight(.semibold)
                     }
                     .padding(.horizontal, 12)
                     .padding(.vertical, 6)
-                    .background(statusInfo.color.opacity(0.15))
+                    .background(
+                        ZStack {
+                            // Opaque background for contrast
+                            Color(uiColor: .systemBackground)
+                            // Colored tint
+                            statusInfo.color.opacity(0.2)
+                        }
+                    )
                     .foregroundColor(statusInfo.color)
                     .cornerRadius(8)
-                    
+                    .shadow(color: Color.black.opacity(0.1), radius: 4, x: 0, y: 2)
+
                     // Progress indicator for in-flight
                     if statusInfo.showProgress {
                         Text("\(flight.accurateProgressPercent)% complete")
@@ -104,6 +134,9 @@ struct FlightHeroSection: View {
                             .foregroundColor(.secondary)
                     }
                 }
+            }
+            .onAppear {
+                loadAirlineName()
             }
             
             // Prominent delay warning for pre-departure flights
@@ -156,8 +189,23 @@ struct FlightHeroSection: View {
             }
         }
         .padding()
-        .glassEffect(.regular, in: .rect(cornerRadius: 20))
+        .brandedGlassEffect(colors: brandColors, cornerRadius: 20, intensity: 0.25)
         .shadow(color: Color.black.opacity(0.1), radius: 15, x: 0, y: 5)
+    }
+
+    private func loadAirlineName() {
+        guard let code = airlineCode else { return }
+
+        Task {
+            do {
+                let airlineProfile = try await AirlineService.shared.getAirlineInfo(code: code)
+                await MainActor.run {
+                    self.airlineName = airlineProfile.name
+                }
+            } catch {
+                print("⚠️ Failed to load airline name: \(error)")
+            }
+        }
     }
 }
 

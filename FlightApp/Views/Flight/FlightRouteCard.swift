@@ -10,7 +10,7 @@ import SwiftUI
 struct FlightRouteCard: View {
     let flight: AeroFlight
     let times: (departure: FlightTime, arrival: FlightTime)
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             // Route Header

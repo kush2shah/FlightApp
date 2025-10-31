@@ -216,6 +216,76 @@ class HapticManager {
         selectionChanged()
     }
 
+    // MARK: - Flurry Effects
+
+    /// Flurry effect - rapid burst of haptics like particles scattering
+    func flurry(count: Int = 5, duration: TimeInterval = 0.3) {
+        guard intensityLevel != .off else { return }
+
+        Task {
+            let delayBetween = duration / Double(count)
+            let delayNanoseconds = UInt64(delayBetween * 1_000_000_000)
+
+            for i in 0..<count {
+                // Vary intensity to create a dynamic feel - start strong, fade out
+                let progress = Double(i) / Double(count)
+                let intensity = 0.9 - (progress * 0.5) // 0.9 -> 0.4
+
+                // Alternate between light and soft for texture
+                let style: UIImpactFeedbackGenerator.FeedbackStyle = i % 2 == 0 ? .light : .soft
+                impact(style, intensity: intensity)
+
+                if i < count - 1 {
+                    try? await Task.sleep(nanoseconds: delayNanoseconds)
+                }
+            }
+        }
+    }
+
+    /// Intense flurry - more aggressive burst for dramatic moments
+    func intenseFlurry() {
+        guard intensityLevel != .off else { return }
+
+        Task {
+            // Quick burst of 7 haptics over 0.4 seconds
+            impact(.rigid, intensity: 1.0)
+            try? await Task.sleep(nanoseconds: 40_000_000) // 40ms
+            impact(.medium, intensity: 0.9)
+            try? await Task.sleep(nanoseconds: 35_000_000) // 35ms
+            impact(.light, intensity: 0.8)
+            try? await Task.sleep(nanoseconds: 30_000_000) // 30ms
+            impact(.soft, intensity: 0.7)
+            try? await Task.sleep(nanoseconds: 30_000_000)
+            impact(.light, intensity: 0.6)
+            try? await Task.sleep(nanoseconds: 35_000_000)
+            impact(.soft, intensity: 0.5)
+            try? await Task.sleep(nanoseconds: 40_000_000)
+            impact(.light, intensity: 0.3)
+        }
+    }
+
+    /// Celebration flurry - uplifting burst for positive events
+    func celebrationFlurry() {
+        guard intensityLevel != .off else { return }
+
+        Task {
+            // Build up then scatter
+            impact(.soft, intensity: 0.5)
+            try? await Task.sleep(nanoseconds: 50_000_000)
+            impact(.medium, intensity: 0.7)
+            try? await Task.sleep(nanoseconds: 40_000_000)
+            impact(.heavy, intensity: 0.9)
+            try? await Task.sleep(nanoseconds: 30_000_000)
+
+            // Scatter in quick succession
+            for i in 0..<4 {
+                let intensity = 0.7 - (Double(i) * 0.15)
+                impact(.light, intensity: intensity)
+                try? await Task.sleep(nanoseconds: 25_000_000)
+            }
+        }
+    }
+
     // MARK: - Custom Patterns with CoreHaptics
 
     /// Play a custom haptic pattern

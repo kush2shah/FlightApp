@@ -74,12 +74,17 @@ class RouteViewModel: ObservableObject {
 
     private func loadFlights(origin: String, destination: String) async {
         do {
-            // Get flights for today
+            // COST OPTIMIZATION: Reduce time window from 36 hours to 18 hours
+            // Get flights from 6 hours ago to 12 hours from now
+            // This still captures en route and near-future flights while reducing API costs
+            let startDate = Calendar.current.date(byAdding: .hour, value: -6, to: Date()) ?? Date()
+            let endDate = Calendar.current.date(byAdding: .hour, value: 12, to: Date())
+
             let flights = try await AeroAPIService.shared.getFlightsBetweenAirports(
                 origin: origin,
                 destination: destination,
-                startDate: Date(),
-                endDate: Calendar.current.date(byAdding: .day, value: 1, to: Date()),
+                startDate: startDate,
+                endDate: endDate,
                 connection: "nonstop"
             )
             currentFlights = flights
@@ -90,7 +95,7 @@ class RouteViewModel: ObservableObject {
                 destinationAirport = firstFlight.destination
             }
 
-            print("✅ Loaded \(flights.count) flights")
+            print("✅ Loaded \(flights.count) flights (including \(flights.filter(\.isInProgress).count) en route)")
         } catch {
             print("⚠️ Failed to load flights: \(error)")
             // If this fails, show error since it's core functionality

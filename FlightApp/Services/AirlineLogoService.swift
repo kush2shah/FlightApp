@@ -62,11 +62,17 @@ class AirlineLogoService {
     }
 
     /// Get SwiftUI Image for airline logo
-    func getLogoImage(iataCode: String?) -> Image? {
+    func getLogoImage(iataCode: String?, forDarkMode: Bool = false) -> Image? {
         guard let code = iataCode,
               let uiImage = loadLogo(iataCode: code) else {
             return nil
         }
+
+        // If requesting for dark mode, use template rendering
+        if forDarkMode {
+            return Image(uiImage: uiImage.withRenderingMode(.alwaysTemplate))
+        }
+
         return Image(uiImage: uiImage)
     }
 
@@ -95,6 +101,24 @@ struct AirlineLogoView: View {
     let size: CGFloat
 
     @State private var logoImage: Image?
+    @Environment(\.colorScheme) var colorScheme
+
+    // Airlines with navy/dark logos that should be shown in white on dark backgrounds
+    private let darkLogoAirlines: Set<String> = [
+        "AA", "AAL",      // American Airlines - Navy
+        "BA", "BAW",      // British Airways - Navy
+        "B6", "JBU",      // JetBlue
+        "DL", "DAL",      // Delta - Navy/Dark Blue
+        "AF", "AFR",      // Air France - Navy
+        "AS", "ASA",      // Alaska Airlines - Navy
+        "NH", "ANA",      // ANA - Navy
+        "EY", "ETD",      // Etihad - Navy
+        "UA", "UAL",      // United Airlines - Dark Blue
+        "LH", "DLH",      // Lufthansa - Dark Blue
+        "CX", "CPA",      // Cathay Pacific - Dark Blue
+        "AC", "ACA",      // Air Canada - Dark Blue
+        "VS", "VIR"       // Virgin Atlantic - Dark Red/Navy
+    ]
 
     init(iataCode: String?, size: CGFloat = 40) {
         self.iataCode = iataCode
@@ -108,6 +132,7 @@ struct AirlineLogoView: View {
                     .resizable()
                     .aspectRatio(contentMode: .fit)
                     .frame(width: size, height: size)
+                    .foregroundColor(shouldUseWhiteLogo ? .white : .primary)
             } else if let code = iataCode {
                 AirlineLogoService.fallbackLogoView(iataCode: code, size: size)
             } else {
@@ -125,14 +150,23 @@ struct AirlineLogoView: View {
         .onAppear {
             loadLogo()
         }
+        .onChange(of: colorScheme) {
+            // Reload logo when color scheme changes
+            loadLogo()
+        }
+    }
+
+    private var shouldUseWhiteLogo: Bool {
+        guard let code = iataCode else { return false }
+        return colorScheme == .dark && darkLogoAirlines.contains(code)
     }
 
     private func loadLogo() {
         guard let code = iataCode else { return }
 
-        // Load logo asynchronously
+        // Load logo asynchronously with dark mode consideration
         DispatchQueue.global(qos: .userInitiated).async {
-            if let image = AirlineLogoService.shared.getLogoImage(iataCode: code) {
+            if let image = AirlineLogoService.shared.getLogoImage(iataCode: code, forDarkMode: self.shouldUseWhiteLogo) {
                 DispatchQueue.main.async {
                     self.logoImage = image
                 }

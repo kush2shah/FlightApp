@@ -137,8 +137,21 @@ struct FlightRouteMapKitView: UIViewRepresentable {
             return MKCoordinateRegion(center: CLLocationCoordinate2D(latitude: 0, longitude: 0), span: MKCoordinateSpan(latitudeDelta: 10, longitudeDelta: 10))
         }
         
-        let latitudes = coordinates.map { $0.latitude }
-        let longitudes = coordinates.map { $0.longitude }
+        // Filter out any invalid coordinates
+        let validCoordinates = coordinates.filter { coord in
+            coord.latitude >= -90 && coord.latitude <= 90 &&
+            coord.longitude >= -180 && coord.longitude <= 180 &&
+            !coord.latitude.isNaN && !coord.longitude.isNaN &&
+            !coord.latitude.isInfinite && !coord.longitude.isInfinite
+        }
+        
+        guard !validCoordinates.isEmpty else {
+            print("⚠️ No valid coordinates for map region")
+            return MKCoordinateRegion(center: CLLocationCoordinate2D(latitude: 0, longitude: 0), span: MKCoordinateSpan(latitudeDelta: 10, longitudeDelta: 10))
+        }
+        
+        let latitudes = validCoordinates.map { $0.latitude }
+        let longitudes = validCoordinates.map { $0.longitude }
         
         let minLat = latitudes.min()!
         let maxLat = latitudes.max()!
@@ -146,19 +159,43 @@ struct FlightRouteMapKitView: UIViewRepresentable {
         let maxLon = longitudes.max()!
         
         let centerLat = (minLat + maxLat) / 2
-        let centerLon = (minLon + maxLon) / 2
+        var centerLon = (minLon + maxLon) / 2
         
         var latDelta = abs(maxLat - minLat) * 1.4
         var lonDelta = abs(maxLon - minLon) * 1.4
         
-        // Handle Pacific crossing
+        // Handle date line crossing (Pacific/International date line)
         if lonDelta > 180 {
-            lonDelta = 360 - lonDelta
+            // Recalculate center for date line crossing
+            let adjustedLons = longitudes.map { $0 < 0 ? $0 + 360 : $0 }
+            let adjustedMinLon = adjustedLons.min()!
+            let adjustedMaxLon = adjustedLons.max()!
+            var adjustedCenterLon = (adjustedMinLon + adjustedMaxLon) / 2
+            if adjustedCenterLon > 180 {
+                adjustedCenterLon -= 360
+            }
+            centerLon = adjustedCenterLon
+            
+            // Recalculate delta for crossing
+            lonDelta = (adjustedMaxLon - adjustedMinLon) * 1.4
+            lonDelta = min(lonDelta, 340) // Cap at reasonable maximum
         }
         
-        // Minimum zoom
-        latDelta = max(latDelta, 2.0)
-        lonDelta = max(lonDelta, 2.0)
+        // Cap deltas to prevent invalid regions (especially for transoceanic flights)
+        latDelta = min(max(latDelta, 2.0), 160) // Min 2°, Max 160° (leave poles visible)
+        lonDelta = min(max(lonDelta, 2.0), 340) // Min 2°, Max 340° (almost full wrap)
+        
+        // Final validation
+        guard centerLat >= -90 && centerLat <= 90 &&
+              centerLon >= -180 && centerLon <= 180 &&
+              latDelta > 0 && latDelta <= 180 &&
+              lonDelta > 0 && lonDelta <= 360 else {
+            print("⚠️ Calculated region is invalid, using fallback")
+            return MKCoordinateRegion(
+                center: validCoordinates.first!,
+                span: MKCoordinateSpan(latitudeDelta: 10, longitudeDelta: 10)
+            )
+        }
         
         return MKCoordinateRegion(
             center: CLLocationCoordinate2D(latitude: centerLat, longitude: centerLon),

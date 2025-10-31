@@ -9,7 +9,7 @@ import SwiftUI
 
 struct FlightGateTerminalCard: View {
     let flight: AeroFlight
-    
+
     private var hasGateInfo: Bool {
         flight.gateOrigin != nil || flight.gateDestination != nil ||
         flight.terminalOrigin != nil || flight.terminalDestination != nil ||
@@ -18,65 +18,86 @@ struct FlightGateTerminalCard: View {
     
     var body: some View {
         if hasGateInfo {
-            VStack(alignment: .leading, spacing: 16) {
-                HStack {
-                    Image(systemName: "building.2")
-                        .foregroundColor(.secondary)
-                    Text("Gate & Terminal Info")
-                        .font(.headline)
-                        .fontWeight(.semibold)
-                    Spacer()
-                }
-                
-                HStack(spacing: 20) {
-                    // Departure info
+            HStack(spacing: 24) {
+                // Departure
+                if flight.gateOrigin != nil || flight.terminalOrigin != nil {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Departure")
-                            .font(.subheadline)
-                            .fontWeight(.medium)
+                            .font(.sfRounded(size: 12, weight: .medium))
                             .foregroundColor(.secondary)
-                        
-                        if let terminal = flight.terminalOrigin {
-                            InfoRow(icon: "building", label: "Terminal", value: terminal)
-                        }
-                        
+
                         if let gate = flight.gateOrigin {
-                            InfoRow(icon: "door.left.hand.open", label: "Gate", value: gate)
+                            HStack(spacing: 6) {
+                                Image(systemName: "door.left.hand.open")
+                                    .font(.system(size: 14))
+                                    .foregroundColor(.blue)
+                                Text("Gate \(gate)")
+                                    .font(.sfRounded(size: 18, weight: .bold))
+                            }
                         }
-                    }
-                    
-                    Spacer()
-                    
-                    // Arrival info
-                    VStack(alignment: .trailing, spacing: 8) {
-                        Text("Arrival")
-                            .font(.subheadline)
-                            .fontWeight(.medium)
-                            .foregroundColor(.secondary)
-                        
-                        if let terminal = flight.terminalDestination {
-                            InfoRow(icon: "building", label: "Terminal", value: terminal, alignment: .trailing)
-                        }
-                        
-                        if let gate = flight.gateDestination {
-                            InfoRow(icon: "door.right.hand.open", label: "Gate", value: gate, alignment: .trailing)
+
+                        if let terminal = flight.terminalOrigin {
+                            Text("Terminal \(terminal)")
+                                .font(.sfRounded(size: 13))
+                                .foregroundColor(.secondary)
                         }
                     }
                 }
-                
-                // Baggage claim (centered)
-                if let baggageClaim = flight.baggageClaim {
-                    HStack {
-                        Spacer()
-                        InfoRow(icon: "suitcase", label: "Baggage Claim", value: baggageClaim)
-                        Spacer()
+
+                if (flight.gateOrigin != nil || flight.terminalOrigin != nil) &&
+                   (flight.gateDestination != nil || flight.terminalDestination != nil) {
+                    Divider()
+                        .frame(height: 40)
+                }
+
+                // Arrival
+                if flight.gateDestination != nil || flight.terminalDestination != nil {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Arrival")
+                            .font(.sfRounded(size: 12, weight: .medium))
+                            .foregroundColor(.secondary)
+
+                        if let gate = flight.gateDestination {
+                            HStack(spacing: 6) {
+                                Image(systemName: "door.right.hand.open")
+                                    .font(.system(size: 14))
+                                    .foregroundColor(.blue)
+                                Text("Gate \(gate)")
+                                    .font(.sfRounded(size: 18, weight: .bold))
+                            }
+                        }
+
+                        if let terminal = flight.terminalDestination {
+                            Text("Terminal \(terminal)")
+                                .font(.sfRounded(size: 13))
+                                .foregroundColor(.secondary)
+                        }
                     }
-                    .padding(.top, 8)
+                }
+
+                Spacer()
+
+                // Baggage claim (if available)
+                if let baggageClaim = flight.baggageClaim {
+                    VStack(alignment: .trailing, spacing: 8) {
+                        Text("Baggage")
+                            .font(.sfRounded(size: 12, weight: .medium))
+                            .foregroundColor(.secondary)
+
+                        HStack(spacing: 6) {
+                            Image(systemName: "suitcase")
+                                .font(.system(size: 14))
+                                .foregroundColor(.blue)
+                            Text(baggageClaim)
+                                .font(.sfRounded(size: 18, weight: .bold))
+                        }
+                    }
                 }
             }
-            .padding()
-            .glassEffect(.regular, in: .rect(cornerRadius: 20))
-            .shadow(color: Color.black.opacity(0.1), radius: 15, x: 0, y: 5)
+            .padding(20)
+            .background(.ultraThinMaterial)
+            .cornerRadius(16)
+            .shadow(color: Color.black.opacity(0.08), radius: 8, x: 0, y: 3)
         }
     }
 }

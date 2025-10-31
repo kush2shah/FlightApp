@@ -41,7 +41,7 @@ struct RecentFlightData: Codable, Hashable {
     }
 
     /// Create from AeroFlight with airline name fetched from API
-    static func from(flight: AeroFlight, airlineName: String?) -> RecentFlightData {
+    static func from(flight: AeroFlight, airlineName: String?, lastFetchedAt: Date? = nil) -> RecentFlightData {
         return RecentFlightData(
             flightNumber: flight.ident,
             airlineIATA: flight.operatorIata,
@@ -54,7 +54,7 @@ struct RecentFlightData: Codable, Hashable {
             scheduledArrival: flight.scheduledIn.flatMap { ISO8601DateFormatter().date(from: $0) },
             status: flight.status,
             progress: flight.progressPercent.flatMap { Double($0) / 100.0 },
-            lastUpdated: Date()
+            lastUpdated: lastFetchedAt ?? Date()
         )
     }
 }

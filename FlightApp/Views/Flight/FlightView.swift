@@ -57,16 +57,6 @@ struct FlightView: View {
 
                             // Airline profile section
                             airlineProfileSection
-
-                            // Status view (if not cancelled)
-                            if !flight.cancelled {
-                                FlightStatusView(flight: flight)
-                            }
-
-                            // Additional flight details
-                            if !flight.cancelled {
-                                FlightDetailsSection(flight: flight)
-                            }
                         }
                         .padding()
                     } else if viewModel.isLoading {
@@ -116,6 +106,11 @@ struct FlightView: View {
         .onChange(of: viewModel.currentFlight?.faFlightId) { oldValue, newValue in
             if viewModel.currentFlight != nil {
                 viewModel.fetchAirlineInfo()
+
+                // Trigger flurry haptic when flight loads for the first time
+                if oldValue == nil && newValue != nil {
+                    HapticManager.shared.celebrationFlurry()
+                }
             }
         }
     }

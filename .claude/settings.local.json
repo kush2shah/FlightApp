@@ -1,7 +1,10 @@
 {
   "permissions": {
     "allow": [
-      "Read(//Users/kush/Downloads/LandmarksBuildingAnAppWithLiquidGlass/**)"
+      "Read(//Users/kush/Downloads/LandmarksBuildingAnAppWithLiquidGlass/**)",
+      "mcp__serena__get_symbols_overview",
+      "mcp__serena__write_memory",
+      "mcp__serena__think_about_collected_information"
     ],
     "deny": [],
     "ask": []

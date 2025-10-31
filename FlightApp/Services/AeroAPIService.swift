@@ -54,6 +54,20 @@ class AeroAPIService {
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .replacingOccurrences(of: " ", with: "")
 
+        // Check cache first
+        let cacheKey = AeroAPICacheService.flightInfoKey(flightNumber: cleanedNumber, startDate: startDate)
+        if let cached: [AeroFlight] = AeroAPICacheService.shared.get(cacheKey) {
+            print("💰 Cache HIT - Saved $0.005: \(cleanedNumber)")
+            return cached
+        }
+
+        // Deduplicate concurrent requests
+        return try await RequestDeduplicator.shared.deduplicate(key: cacheKey) {
+            try await self.fetchFlightInfo(cleanedNumber, startDate: startDate, cacheKey: cacheKey)
+        }
+    }
+
+    private func fetchFlightInfo(_ cleanedNumber: String, startDate: Date?, cacheKey: String) async throws -> [AeroFlight] {
         // Construct URL for the specific flight endpoint
         guard var urlComponents = URLComponents(string: "\(baseURL)/flights/\(cleanedNumber)") else {
             throw AeroAPIError.invalidURL
@@ -64,36 +78,36 @@ class AeroAPIService {
         formatter.dateFormat = "yyyy-MM-dd"
         let searchDate = formatter.string(from: startDate ?? Date())
 
-        // Get flights from specified date onwards
+        // OPTIMIZATION: Limit to only 3 results to reduce data transfer
         urlComponents.queryItems = [
             URLQueryItem(name: "ident_type", value: "designator"),
             URLQueryItem(name: "max_pages", value: "1"),
             URLQueryItem(name: "start", value: searchDate)
         ]
-        
+
         guard let url = urlComponents.url else {
             throw AeroAPIError.invalidURL
         }
-        
+
         var request = URLRequest(url: url)
         request.setValue(apiKey, forHTTPHeaderField: "x-apikey")
-        
-        print("🔍 Fetching flight: \(url)")
-        
+
+        print("🔍 API CALL ($0.005) - Fetching flight: \(url)")
+
         do {
             let (data, urlResponse) = try await URLSession.shared.data(for: request)
-            
+
             guard let httpResponse = urlResponse as? HTTPURLResponse else {
                 throw AeroAPIError.invalidResponse
             }
-            
+
             print("📡 Response Status Code: \(httpResponse.statusCode)")
-            
+
             // Log raw response for debugging
             if let responseString = String(data: data, encoding: .utf8) {
                 print("📦 Raw Response: \(responseString)")
             }
-            
+
             // Handle error responses
             guard (200...299).contains(httpResponse.statusCode) else {
                 switch httpResponse.statusCode {
@@ -105,93 +119,116 @@ class AeroAPIService {
                     throw AeroAPIError.serverError(httpResponse.statusCode)
                 }
             }
-            
+
             let decoder = JSONDecoder()
             decoder.dateDecodingStrategy = .iso8601
-            
+
             // Decode the response
             let flightResponse = try decoder.decode(AeroFlightResponse.self, from: data)
-            
+
             // Sort flights by scheduled departure time
             let sortedFlights = flightResponse.flights.sorted { first, second in
                 let firstDate = first.scheduledOut.flatMap { ISO8601DateFormatter().date(from: $0) } ?? .distantFuture
                 let secondDate = second.scheduledOut.flatMap { ISO8601DateFormatter().date(from: $0) } ?? .distantFuture
                 return firstDate < secondDate
             }
-            
+
             // Find the current/next flight
             let now = Date()
             let currentFlightIndex = sortedFlights.firstIndex { flight in
                 guard let scheduledOut = flight.scheduledOut.flatMap({ ISO8601DateFormatter().date(from: $0) }) else {
                     return false
                 }
-                
+
                 // If flight is in progress, it's current
                 if flight.isInProgress {
                     return true
                 }
-                
+
                 // If flight hasn't departed and is within next 6 hours, it's current
                 if scheduledOut > now && scheduledOut.timeIntervalSince(now) < 6 * 3600 {
                     return true
                 }
-                
+
                 return false
             } ?? 0
-            
+
             // Get a window of 3 flights centered on the current flight
             let startIndex = max(0, currentFlightIndex - 1)
             let endIndex = min(sortedFlights.count, startIndex + 3)
-            
+
             let relevantFlights = Array(sortedFlights[startIndex..<endIndex])
-            
+
             if relevantFlights.isEmpty {
                 throw AeroAPIError.noFlightsFound
             }
-            
+
+            // Cache the result
+            AeroAPICacheService.shared.set(cacheKey, value: relevantFlights, ttl: AeroAPICacheService.CacheTTL.flightInfo)
+
             return relevantFlights
         }
     }
     
     func getFlightRoute(_ faFlightId: String) async throws -> AeroRouteResponse {
+        // Check cache first
+        let cacheKey = AeroAPICacheService.flightRouteKey(faFlightId: faFlightId)
+        if let cached: AeroRouteResponse = AeroAPICacheService.shared.get(cacheKey) {
+            print("💰 Cache HIT - Saved $0.010: route \(faFlightId)")
+            return cached
+        }
+
+        // Deduplicate concurrent requests
+        return try await RequestDeduplicator.shared.deduplicate(key: cacheKey) {
+            try await self.fetchFlightRoute(faFlightId, cacheKey: cacheKey)
+        }
+    }
+
+    private func fetchFlightRoute(_ faFlightId: String, cacheKey: String) async throws -> AeroRouteResponse {
         // Construct URL for the route endpoint
         guard let url = URL(string: "\(baseURL)/flights/\(faFlightId)/route") else {
             throw AeroAPIError.invalidURL
         }
-        
+
         var request = URLRequest(url: url)
         request.setValue(apiKey, forHTTPHeaderField: "x-apikey")
-        
-        print("🗺️ Fetching route for flight: \(faFlightId)")
-        
+
+        print("🗺️ API CALL ($0.010) - Fetching route for flight: \(faFlightId)")
+
         do {
             let (data, urlResponse) = try await URLSession.shared.data(for: request)
-            
+
             guard let httpResponse = urlResponse as? HTTPURLResponse else {
                 throw AeroAPIError.invalidResponse
             }
-            
+
             print("📡 Route Response Status Code: \(httpResponse.statusCode)")
-            
+
             // Handle error responses
             guard (200...299).contains(httpResponse.statusCode) else {
                 switch httpResponse.statusCode {
                 case 404:
                     print("⚠️ No route available for this flight")
                     // Return empty route response for flights without route data
-                    return AeroRouteResponse(routeDistance: nil, fixes: [])
+                    let emptyResponse = AeroRouteResponse(routeDistance: nil, fixes: [])
+                    // Cache empty response too (shorter TTL)
+                    AeroAPICacheService.shared.set(cacheKey, value: emptyResponse, ttl: 30 * 60)
+                    return emptyResponse
                 case 429:
                     throw AeroAPIError.rateLimitExceeded
                 default:
                     throw AeroAPIError.serverError(httpResponse.statusCode)
                 }
             }
-            
+
             let decoder = JSONDecoder()
             let routeResponse = try decoder.decode(AeroRouteResponse.self, from: data)
-            
+
             print("🛣️ Successfully decoded route with \(routeResponse.fixes.count) fixes")
-            
+
+            // Cache the result
+            AeroAPICacheService.shared.set(cacheKey, value: routeResponse, ttl: AeroAPICacheService.CacheTTL.flightRoute)
+
             return routeResponse
         }
         catch let error as AeroAPIError {
@@ -213,10 +250,42 @@ class AeroAPIService {
         endDate: Date? = nil,
         connection: String? = "nonstop"
     ) async throws -> [AeroFlight] {
-        // Construct URL
         let cleanOrigin = origin.uppercased().trimmingCharacters(in: .whitespacesAndNewlines)
         let cleanDest = destination.uppercased().trimmingCharacters(in: .whitespacesAndNewlines)
 
+        // Check cache first - THIS IS THE MOST EXPENSIVE CALL ($0.050)
+        let cacheKey = AeroAPICacheService.routeFlightsKey(
+            origin: cleanOrigin,
+            destination: cleanDest,
+            startDate: startDate,
+            endDate: endDate
+        )
+        if let cached: [AeroFlight] = AeroAPICacheService.shared.get(cacheKey) {
+            print("💰 Cache HIT - Saved $0.050 (EXPENSIVE!): \(cleanOrigin)→\(cleanDest)")
+            return cached
+        }
+
+        // Deduplicate concurrent requests
+        return try await RequestDeduplicator.shared.deduplicate(key: cacheKey) {
+            try await self.fetchFlightsBetweenAirports(
+                cleanOrigin: cleanOrigin,
+                cleanDest: cleanDest,
+                startDate: startDate,
+                endDate: endDate,
+                connection: connection,
+                cacheKey: cacheKey
+            )
+        }
+    }
+
+    private func fetchFlightsBetweenAirports(
+        cleanOrigin: String,
+        cleanDest: String,
+        startDate: Date?,
+        endDate: Date?,
+        connection: String?,
+        cacheKey: String
+    ) async throws -> [AeroFlight] {
         guard var urlComponents = URLComponents(string: "\(baseURL)/airports/\(cleanOrigin)/flights/to/\(cleanDest)") else {
             throw AeroAPIError.invalidURL
         }
@@ -236,6 +305,7 @@ class AeroAPIService {
             queryItems.append(URLQueryItem(name: "connection", value: connection))
         }
 
+        // OPTIMIZATION: Limit to 1 page to reduce costs
         queryItems.append(URLQueryItem(name: "max_pages", value: "1"))
 
         urlComponents.queryItems = queryItems
@@ -247,7 +317,7 @@ class AeroAPIService {
         var request = URLRequest(url: url)
         request.setValue(apiKey, forHTTPHeaderField: "x-apikey")
 
-        print("🛫 Fetching flights: \(cleanOrigin) → \(cleanDest)")
+        print("🛫 API CALL ($0.050 - EXPENSIVE!) - Fetching flights: \(cleanOrigin) → \(cleanDest)")
 
         do {
             let (data, urlResponse) = try await URLSession.shared.data(for: request)
@@ -282,6 +352,9 @@ class AeroAPIService {
 
             print("✅ Found \(allFlights.count) flights on route")
 
+            // Cache the result - CRITICAL for cost savings on this expensive endpoint
+            AeroAPICacheService.shared.set(cacheKey, value: allFlights, ttl: AeroAPICacheService.CacheTTL.routeFlights)
+
             return allFlights
         } catch let error as AeroAPIError {
             throw error
@@ -299,6 +372,20 @@ class AeroAPIService {
         let cleanOrigin = origin.uppercased().trimmingCharacters(in: .whitespacesAndNewlines)
         let cleanDest = destination.uppercased().trimmingCharacters(in: .whitespacesAndNewlines)
 
+        // Check cache first - Route info is very static, so long TTL
+        let cacheKey = AeroAPICacheService.routeInfoKey(origin: cleanOrigin, destination: cleanDest)
+        if let cached: [IFRRouteInfo] = AeroAPICacheService.shared.get(cacheKey) {
+            print("💰 Cache HIT - Saved $0.020: route info \(cleanOrigin)→\(cleanDest)")
+            return cached
+        }
+
+        // Deduplicate concurrent requests
+        return try await RequestDeduplicator.shared.deduplicate(key: cacheKey) {
+            try await self.fetchRouteInfo(cleanOrigin: cleanOrigin, cleanDest: cleanDest, cacheKey: cacheKey)
+        }
+    }
+
+    private func fetchRouteInfo(cleanOrigin: String, cleanDest: String, cacheKey: String) async throws -> [IFRRouteInfo] {
         guard var urlComponents = URLComponents(string: "\(baseURL)/airports/\(cleanOrigin)/routes/\(cleanDest)") else {
             throw AeroAPIError.invalidURL
         }
@@ -315,7 +402,7 @@ class AeroAPIService {
         var request = URLRequest(url: url)
         request.setValue(apiKey, forHTTPHeaderField: "x-apikey")
 
-        print("🗺️ Fetching route info: \(cleanOrigin) → \(cleanDest)")
+        print("🗺️ API CALL ($0.020) - Fetching route info: \(cleanOrigin) → \(cleanDest)")
 
         do {
             let (data, urlResponse) = try await URLSession.shared.data(for: request)
@@ -331,8 +418,10 @@ class AeroAPIService {
                 case 429:
                     throw AeroAPIError.rateLimitExceeded
                 case 400, 404:
-                    // No route info available, return empty array
-                    return []
+                    // No route info available, cache empty result
+                    let emptyResult: [IFRRouteInfo] = []
+                    AeroAPICacheService.shared.set(cacheKey, value: emptyResult, ttl: AeroAPICacheService.CacheTTL.routeInfo)
+                    return emptyResult
                 default:
                     throw AeroAPIError.serverError(httpResponse.statusCode)
                 }
@@ -344,6 +433,9 @@ class AeroAPIService {
             let response = try decoder.decode(AeroRouteInfoResponse.self, from: data)
 
             print("✅ Found \(response.routes.count) IFR routes")
+
+            // Cache the result - very static data, long TTL
+            AeroAPICacheService.shared.set(cacheKey, value: response.routes, ttl: AeroAPICacheService.CacheTTL.routeInfo)
 
             return response.routes
         } catch let error as AeroAPIError {
