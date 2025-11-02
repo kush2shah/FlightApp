@@ -12,6 +12,7 @@ class RouteViewModel: ObservableObject {
     @Published var ifrRoutes: [IFRRouteInfo] = []
     @Published var currentFlights: [AeroFlight] = []
     @Published var awards: [AwardAvailability] = []
+    @Published var awardFilters = AwardPreferences.shared.createDefaultFilters()
     @Published var isLoading = false
     @Published var error: String?
     @Published var originAirport: AeroAirport?
@@ -19,6 +20,58 @@ class RouteViewModel: ObservableObject {
 
     var shouldShowAwards: Bool {
         FeatureFlags.shared.canUseSeatsAero
+    }
+
+    // Filtered awards based on user-selected filters
+    var filteredAwards: [AwardAvailability] {
+        var filtered = awards
+
+        // Filter by cabin class
+        filtered = filtered.filter { award in
+            awardFilters.selectedCabins.contains { cabin in
+                award.isCabinAvailable(cabin)
+            }
+        }
+
+        // Filter by date range
+        filtered = filtered.filter { award in
+            guard let date = award.parsedDate else { return false }
+            return date >= awardFilters.dateRange.startDate && date <= awardFilters.dateRange.endDate
+        }
+
+        // Filter by mileage programs (if specific programs selected)
+        if !awardFilters.selectedPrograms.isEmpty {
+            filtered = filtered.filter { award in
+                awardFilters.selectedPrograms.contains { program in
+                    award.source.lowercased().contains(program.lowercased())
+                }
+            }
+        }
+
+        // Filter by max points (if set)
+        if let maxPoints = awardFilters.maxPoints {
+            filtered = filtered.filter { award in
+                guard let best = award.bestAvailableCabin() else { return false }
+                let costString = best.cost.replacingOccurrences(of: ",", with: "")
+                guard let cost = Int(costString) else { return false }
+                return cost <= maxPoints
+            }
+        }
+
+        return filtered
+    }
+
+    // Smart recommendations - top 3 best value awards
+    var recommendedAwards: [AwardAvailability] {
+        filteredAwards
+            .sorted { $0.valueScore() > $1.valueScore() }
+            .prefix(3)
+            .map { $0 }
+    }
+
+    // All unique mileage programs in results (for filter UI)
+    var availablePrograms: [String] {
+        Array(Set(awards.map { $0.source })).sorted()
     }
 
     // Primary route to display (most frequently filed)
@@ -106,8 +159,10 @@ class RouteViewModel: ObservableObject {
     }
 
     private func loadAwards(origin: String, destination: String) async {
+        print("🎯 [AWARDS] Starting award search for \(origin) → \(destination)")
+
         guard FeatureFlags.shared.canUseSeatsAero else {
-            print("ℹ️ Seats.aero disabled, skipping award search")
+            print("ℹ️ [AWARDS] Seats.aero disabled, skipping award search")
             return
         }
 
@@ -116,24 +171,56 @@ class RouteViewModel: ObservableObject {
             let originIATA = SearchInputParser.shared.icaoToIata(origin)
             let destIATA = SearchInputParser.shared.icaoToIata(destination)
 
-            // Search next 30 days
-            let startDate = Date()
-            let endDate = Calendar.current.date(byAdding: .day, value: 30, to: startDate)
+            print("🔄 [AWARDS] Converted codes: \(origin) → \(originIATA), \(destination) → \(destIATA)")
+
+            // Use date range from filter preferences
+            let startDate = awardFilters.dateRange.startDate
+            let endDate = awardFilters.dateRange.endDate
+
+            let dateFormatter = DateFormatter()
+            dateFormatter.dateFormat = "yyyy-MM-dd"
+            print("📅 [AWARDS] Date range: \(dateFormatter.string(from: startDate)) to \(dateFormatter.string(from: endDate))")
+
+            // Use cabin preferences for API search
+            let cabinsParam = awardFilters.cabinsParameter
+            print("💺 [AWARDS] Searching cabins: \(cabinsParam)")
 
             let response = try await SeatsAeroAPIService.shared.searchAwards(
                 origin: originIATA,
                 destination: destIATA,
                 startDate: startDate,
                 endDate: endDate,
-                cabins: "business,first"
+                cabins: cabinsParam
             )
             awards = response.data
-            print("✅ Loaded \(response.data.count) award options")
+            print("✅ [AWARDS] Loaded \(response.data.count) award options (searching: \(cabinsParam))")
+
+            if response.data.isEmpty {
+                print("ℹ️ [AWARDS] No award availability found for this route/date range")
+            }
         } catch SeatsAeroAPIError.featureDisabled {
-            print("ℹ️ Seats.aero feature disabled by user")
+            print("ℹ️ [AWARDS] Seats.aero feature disabled by user")
+        } catch SeatsAeroAPIError.unauthorized {
+            print("❌ [AWARDS] API authentication failed - check API key")
+        } catch SeatsAeroAPIError.rateLimitExceeded {
+            print("⚠️ [AWARDS] Rate limit exceeded")
+        } catch SeatsAeroAPIError.noResultsFound {
+            print("ℹ️ [AWARDS] API returned no results (400 status)")
+        } catch SeatsAeroAPIError.serverError(let statusCode) {
+            print("❌ [AWARDS] Server error: \(statusCode)")
         } catch {
-            print("⚠️ Failed to load awards: \(error)")
+            print("⚠️ [AWARDS] Failed to load awards: \(error)")
+            print("🔍 [AWARDS] Error details: \(error.localizedDescription)")
             // Award data is optional, don't show error
         }
+    }
+
+    // Get route info for booking URLs
+    func getRouteInfo() -> (origin: String, destination: String)? {
+        guard let origin = originAirport?.codeIata ?? originAirport?.codeIcao,
+              let destination = destinationAirport?.codeIata ?? destinationAirport?.codeIcao else {
+            return nil
+        }
+        return (origin, destination)
     }
 }

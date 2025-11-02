@@ -18,30 +18,31 @@ struct RouteView: View {
 
     var body: some View {
         NavigationView {
-            ScrollView {
-                VStack(spacing: 0) {
-                    if viewModel.isLoading {
-                        loadingView
-                    } else if let error = viewModel.error {
-                        errorView(error)
-                    } else {
-                        routeContentView
+            ZStack {
+                // Liquid glass background layer
+                Color.clear
+                    .background(.ultraThinMaterial)
+                    .ignoresSafeArea()
+
+                ScrollView {
+                    VStack(spacing: 0) {
+                        if viewModel.isLoading {
+                            loadingView
+                        } else if let error = viewModel.error {
+                            errorView(error)
+                        } else {
+                            routeContentView
+                        }
                     }
                 }
             }
-            .background(Color(.systemGroupedBackground))
             .navigationTitle("\(origin) → \(destination)")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
-                        dismiss()
-                    }
-                }
-            }
             .sheet(item: $selectedFlight) { identifiableFlightNumber in
                 FlightView(flightNumber: identifiableFlightNumber.value, faFlightId: identifiableFlightNumber.faFlightId, skipFlightSelection: true)
+                    .presentationDetents([.medium, .large])
                     .presentationDragIndicator(.visible)
+                    .presentationBackgroundInteraction(.enabled)
             }
         }
         .task {
@@ -50,29 +51,56 @@ struct RouteView: View {
     }
 
     private var loadingView: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 24) {
+            // Loading Icon - matches error view pattern
+            Circle()
+                .fill(Color.blue.opacity(0.1))
+                .frame(width: 80, height: 80)
+                .overlay(
+                    Image(systemName: "airplane")
+                        .font(.system(size: 32))
+                        .foregroundColor(.blue)
+                        .symbolEffect(.pulse, options: .repeating)
+                )
+
+            VStack(spacing: 8) {
+                Text("Loading Route")
+                    .font(.sfRounded(size: 24, weight: .bold))
+                Text("Fetching route information...")
+                    .font(.sfRounded(size: 15))
+                    .foregroundColor(.secondary)
+            }
+
+            // Progress indicator to show active loading
             ProgressView()
-                .scaleEffect(1.5)
-            Text("Loading route information...")
-                .font(.sfRounded(size: 16))
-                .foregroundColor(.secondary)
+                .tint(.blue)
         }
         .frame(maxWidth: .infinity)
         .padding(.top, 100)
     }
 
     private func errorView(_ error: String) -> some View {
-        VStack(spacing: 16) {
-            Image(systemName: "exclamationmark.triangle")
-                .font(.system(size: 48))
-                .foregroundColor(.orange)
-            Text("Error Loading Route")
-                .font(.sfRounded(size: 20, weight: .semibold))
-            Text(error)
-                .font(.sfRounded(size: 14))
-                .foregroundColor(.secondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal)
+        VStack(spacing: 24) {
+            // Error Icon
+            Circle()
+                .fill(Color.orange.opacity(0.1))
+                .frame(width: 80, height: 80)
+                .overlay(
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 32))
+                        .foregroundColor(.orange)
+                )
+
+            // Error Message
+            VStack(spacing: 8) {
+                Text("Error Loading Route")
+                    .font(.sfRounded(size: 24, weight: .bold))
+                Text(error)
+                    .font(.sfRounded(size: 15))
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
+            }
         }
         .frame(maxWidth: .infinity)
         .padding(.top, 100)
@@ -112,20 +140,29 @@ struct RouteView: View {
     }
 
     private var emptyRouteState: some View {
-        VStack(spacing: 20) {
-            Image(systemName: "airplane.departure")
-                .font(.system(size: 56))
-                .foregroundColor(.secondary)
+        VStack(spacing: 24) {
+            // Empty State Icon
+            Circle()
+                .fill(Color.blue.opacity(0.1))
+                .frame(width: 80, height: 80)
+                .overlay(
+                    Image(systemName: "airplane.departure")
+                        .font(.system(size: 32))
+                        .foregroundColor(.blue)
+                )
 
-            Text("No Flights Found")
-                .font(.sfRounded(size: 24, weight: .bold))
-                .foregroundColor(.primary)
+            // Empty State Message
+            VStack(spacing: 8) {
+                Text("No Flights Found")
+                    .font(.sfRounded(size: 24, weight: .bold))
+                    .foregroundColor(.primary)
 
-            Text("There are no scheduled flights on this route today. Try searching for a different date or route.")
-                .font(.sfRounded(size: 15))
-                .foregroundColor(.secondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 40)
+                Text("There are no scheduled flights on this route today. Try searching for a different date or route.")
+                    .font(.sfRounded(size: 15))
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 40)
+            }
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 80)
@@ -151,11 +188,9 @@ struct RouteView: View {
                         selectedFlight = IdentifiableString(value: flight.ident, faFlightId: flight.faFlightId)
                     }) {
                         FlightRowCard(flight: flight)
-                            .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 16))
-                            .shadow(color: Color.black.opacity(0.06), radius: 6, x: 0, y: 3)
                             .contentShape(Rectangle())
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(PlainButtonStyle())
                 }
             }
             .padding(.horizontal)
@@ -190,6 +225,7 @@ struct RouteView: View {
 
     private var awardAvailabilitySection: some View {
         VStack(alignment: .leading, spacing: 20) {
+            // Header
             HStack {
                 Text("Award Availability")
                     .font(.sfRounded(size: 28, weight: .bold))
@@ -200,18 +236,84 @@ struct RouteView: View {
             }
             .padding(.horizontal)
 
-            VStack(spacing: 14) {
-                ForEach(viewModel.awards.prefix(20)) { award in
-                    AwardRowCard(award: award)
-                }
-            }
-            .padding(.horizontal)
+            // Filter Bar
+            AwardFilterBar(filters: $viewModel.awardFilters, availablePrograms: viewModel.availablePrograms)
+                .padding(.horizontal)
 
-            if viewModel.awards.count > 20 {
-                Text("Showing first 20 results")
-                    .font(.sfRounded(size: 13))
-                    .foregroundColor(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .center)
+            // Results count and recommendations
+            if !viewModel.filteredAwards.isEmpty {
+                HStack {
+                    Text("\(viewModel.filteredAwards.count) \(viewModel.filteredAwards.count == 1 ? "award" : "awards") found")
+                        .font(.sfRounded(size: 14, weight: .medium))
+                        .foregroundColor(.secondary)
+
+                    Spacer()
+
+                    if viewModel.awardFilters.hasActiveFilters {
+                        Button(action: {
+                            HapticManager.shared.impact(.light)
+                            viewModel.awardFilters.reset()
+                        }) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "xmark.circle.fill")
+                                    .font(.system(size: 12))
+                                Text("Clear Filters")
+                                    .font(.sfRounded(size: 13, weight: .medium))
+                            }
+                            .foregroundColor(.blue)
+                        }
+                    }
+                }
+                .padding(.horizontal)
+
+                // Award cards
+                VStack(spacing: 14) {
+                    ForEach(Array(viewModel.filteredAwards.prefix(20).enumerated()), id: \.element.id) { index, award in
+                        AwardRowCard(
+                            award: award,
+                            isRecommended: viewModel.recommendedAwards.contains(where: { $0.id == award.id }),
+                            origin: origin,
+                            destination: destination
+                        )
+                    }
+                }
+                .padding(.horizontal)
+
+                if viewModel.filteredAwards.count > 20 {
+                    Text("Showing first 20 results")
+                        .font(.sfRounded(size: 13))
+                        .foregroundColor(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                }
+            } else if !viewModel.awards.isEmpty {
+                // No results after filtering
+                VStack(spacing: 24) {
+                    // Empty Filter Icon
+                    Circle()
+                        .fill(Color.blue.opacity(0.1))
+                        .frame(width: 64, height: 64)
+                        .overlay(
+                            Image(systemName: "line.3.horizontal.decrease.circle")
+                                .font(.system(size: 28))
+                                .foregroundColor(.blue)
+                        )
+
+                    VStack(spacing: 8) {
+                        Text("No awards match your filters")
+                            .font(.sfRounded(size: 18, weight: .semibold))
+                            .foregroundColor(.primary)
+
+                        Button("Clear Filters") {
+                            HapticManager.shared.impact(.light)
+                            viewModel.awardFilters.reset()
+                        }
+                        .font(.sfRounded(size: 14, weight: .medium))
+                        .foregroundColor(.blue)
+                        .padding(.top, 4)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 40)
             }
         }
     }
@@ -565,6 +667,12 @@ struct FlightRowCard: View {
             }
         }
         .padding(18)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(.clear)
+                .glassEffect(.regular, in: .rect(cornerRadius: 16))
+                .shadow(color: Color.black.opacity(0.06), radius: 6, x: 0, y: 3)
+        )
     }
 
     private var statusColor: Color {
@@ -608,54 +716,331 @@ struct FlightRowCard: View {
     }
 }
 
+// MARK: - Award Filter Bar
+
+struct AwardFilterBar: View {
+    @Binding var filters: AwardFilters
+    let availablePrograms: [String]
+
+    @State private var showDatePicker = false
+    @State private var showProgramsMenu = false
+
+    var body: some View {
+        VStack(spacing: 12) {
+            // Cabin class chips
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 10) {
+                    ForEach(CabinClass.allCases, id: \.self) { cabin in
+                        CabinChip(
+                            cabin: cabin,
+                            isSelected: filters.selectedCabins.contains(cabin),
+                            onTap: {
+                                HapticManager.shared.impact(.soft)
+                                if filters.selectedCabins.contains(cabin) {
+                                    filters.selectedCabins.remove(cabin)
+                                } else {
+                                    filters.selectedCabins.insert(cabin)
+                                }
+                            }
+                        )
+                    }
+
+                    Divider()
+                        .frame(height: 24)
+
+                    // Date range button
+                    Button(action: {
+                        HapticManager.shared.impact(.soft)
+                        showDatePicker.toggle()
+                    }) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "calendar")
+                                .font(.system(size: 12, weight: .medium))
+                            Text("\(filters.dateRange.daysCount) days")
+                                .font(.sfRounded(size: 13, weight: .medium))
+                        }
+                        .foregroundColor(filters.dateRange == .next30Days ? .secondary : .blue)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .glassEffect(.regular, in: .rect(cornerRadius: 16))
+                    }
+
+                    // Mileage programs filter
+                    if !availablePrograms.isEmpty {
+                        Menu {
+                            ForEach(availablePrograms, id: \.self) { program in
+                                Button(action: {
+                                    HapticManager.shared.impact(.soft)
+                                    if filters.selectedPrograms.contains(program) {
+                                        filters.selectedPrograms.remove(program)
+                                    } else {
+                                        filters.selectedPrograms.insert(program)
+                                    }
+                                }) {
+                                    HStack {
+                                        Text(program)
+                                        if filters.selectedPrograms.contains(program) {
+                                            Image(systemName: "checkmark")
+                                        }
+                                    }
+                                }
+                            }
+                            if !filters.selectedPrograms.isEmpty {
+                                Divider()
+                                Button("Clear Program Filter", action: {
+                                    HapticManager.shared.impact(.light)
+                                    filters.selectedPrograms.removeAll()
+                                })
+                            }
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: "building.2")
+                                    .font(.system(size: 12, weight: .medium))
+                                if filters.selectedPrograms.isEmpty {
+                                    Text("All Programs")
+                                        .font(.sfRounded(size: 13, weight: .medium))
+                                } else {
+                                    Text("\(filters.selectedPrograms.count) selected")
+                                        .font(.sfRounded(size: 13, weight: .medium))
+                                }
+                            }
+                            .foregroundColor(filters.selectedPrograms.isEmpty ? .secondary : .blue)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 8)
+                            .glassEffect(.regular, in: .rect(cornerRadius: 16))
+                        }
+                    }
+                }
+                .padding(.horizontal, 2)
+            }
+
+            // Date range picker (shown when expanded)
+            if showDatePicker {
+                VStack(spacing: 12) {
+                    Text("Search Date Range")
+                        .font(.sfRounded(size: 14, weight: .semibold))
+                        .foregroundColor(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                    VStack(spacing: 8) {
+                        DateRangeButton(title: "Next 7 Days", range: .next7Days, currentRange: $filters.dateRange)
+                        DateRangeButton(title: "Next 30 Days", range: .next30Days, currentRange: $filters.dateRange)
+                        DateRangeButton(title: "Next 60 Days", range: .next60Days, currentRange: $filters.dateRange)
+                        DateRangeButton(title: "Next 90 Days", range: .next90Days, currentRange: $filters.dateRange)
+                    }
+                }
+                .padding()
+                .glassEffect(.regular, in: .rect(cornerRadius: 16))
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+    }
+}
+
+struct CabinChip: View {
+    let cabin: CabinClass
+    let isSelected: Bool
+    let onTap: () -> Void
+
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: 6) {
+                Image(systemName: cabin.icon)
+                    .font(.system(size: 12, weight: .medium))
+                Text(cabin.displayName)
+                    .font(.sfRounded(size: 13, weight: .medium))
+            }
+            .foregroundColor(isSelected ? .white : .secondary)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            .background(
+                Group {
+                    if isSelected {
+                        Color.blue
+                    } else {
+                        Color.clear
+                            .glassEffect(.regular, in: .rect(cornerRadius: 16))
+                    }
+                }
+            )
+            .cornerRadius(16)
+        }
+    }
+}
+
+struct DateRangeButton: View {
+    let title: String
+    let range: DateRange
+    @Binding var currentRange: DateRange
+
+    var isSelected: Bool {
+        currentRange == range
+    }
+
+    var body: some View {
+        Button(action: {
+            HapticManager.shared.impact(.soft)
+            currentRange = range
+        }) {
+            HStack {
+                Text(title)
+                    .font(.sfRounded(size: 14, weight: .medium))
+                Spacer()
+                if isSelected {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 12, weight: .semibold))
+                }
+            }
+            .foregroundColor(isSelected ? .blue : .primary)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(isSelected ? Color.blue.opacity(0.1) : Color.clear)
+            .cornerRadius(10)
+        }
+    }
+}
+
 // MARK: - Award Row Card
 
 struct AwardRowCard: View {
     let award: AwardAvailability
+    let isRecommended: Bool
+    let origin: String
+    let destination: String
+
+    @State private var showAllCabins = false
 
     var body: some View {
-        HStack(spacing: 16) {
-            // Date icon and info
-            VStack(alignment: .leading, spacing: 6) {
-                HStack(spacing: 8) {
-                    Image(systemName: "calendar")
-                        .font(.system(size: 16))
+        let bookingURL = award.generateBookingURL(origin: origin, destination: destination)
+
+        Button(action: {
+            HapticManager.shared.impact(.light)
+            if let bookingURL = bookingURL {
+                UIApplication.shared.open(bookingURL)
+            }
+        }) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 16) {
+                    // Date icon and info
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "calendar")
+                                .font(.system(size: 16))
+                                .foregroundColor(.blue)
+                            Text(formatDate(award.date))
+                                .font(.sfRounded(size: 16, weight: .semibold))
+                                .foregroundColor(.primary)
+
+                            if isRecommended {
+                                Text("Best Value")
+                                    .font(.sfRounded(size: 11, weight: .bold))
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(Color.green)
+                                    .cornerRadius(6)
+                            }
+                        }
+                        Text(formatProgram(award.source))
+                            .font(.sfRounded(size: 13))
+                            .foregroundColor(.secondary)
+                    }
+
+                    Spacer()
+
+                    // Book button - only show if we have a valid booking URL
+                    if bookingURL != nil {
+                        HStack(spacing: 6) {
+                            Text("Book")
+                                .font(.sfRounded(size: 14, weight: .semibold))
+                            Image(systemName: "arrow.up.right")
+                                .font(.system(size: 12, weight: .semibold))
+                        }
                         .foregroundColor(.blue)
-                    Text(formatDate(award.date))
-                        .font(.sfRounded(size: 16, weight: .semibold))
-                        .foregroundColor(.primary)
-                }
-                Text(formatProgram(award.source))
-                    .font(.sfRounded(size: 13))
-                    .foregroundColor(.secondary)
-            }
-
-            Spacer()
-
-            if let cabin = award.bestAvailableCabin() {
-                VStack(alignment: .trailing, spacing: 6) {
-                    HStack(spacing: 4) {
-                        Text(cabin.cost)
-                            .font(.sfRounded(size: 18, weight: .bold))
-                            .foregroundColor(.blue)
-                        Text("pts")
-                            .font(.sfRounded(size: 13, weight: .medium))
-                            .foregroundColor(.secondary)
-                    }
-                    HStack(spacing: 6) {
-                        Text(cabin.cabin)
-                            .font(.sfRounded(size: 13, weight: .medium))
-                            .foregroundColor(.primary)
-                        Text("• \(cabin.seats) left")
-                            .font(.sfRounded(size: 12))
-                            .foregroundColor(.secondary)
                     }
                 }
+
+                // Best available cabin (always shown)
+                if let cabin = award.bestAvailableCabin() {
+                    HStack {
+                        HStack(spacing: 4) {
+                            Text(cabin.cost)
+                                .font(.sfRounded(size: 18, weight: .bold))
+                                .foregroundColor(.blue)
+                            Text("pts")
+                                .font(.sfRounded(size: 13, weight: .medium))
+                                .foregroundColor(.secondary)
+                        }
+
+                        Spacer()
+
+                        HStack(spacing: 6) {
+                            Text(cabin.cabin)
+                                .font(.sfRounded(size: 13, weight: .medium))
+                                .foregroundColor(.primary)
+                            Text("• \(cabin.seats) left")
+                                .font(.sfRounded(size: 12))
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
+
+                // Show all available cabins if expanded
+                if showAllCabins {
+                    Divider()
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("All Available Cabins")
+                            .font(.sfRounded(size: 12, weight: .semibold))
+                            .foregroundColor(.secondary)
+
+                        ForEach(award.allAvailableCabins(), id: \.cabin) { cabin in
+                            HStack {
+                                Image(systemName: cabin.cabin.icon)
+                                    .font(.system(size: 12))
+                                    .foregroundColor(.blue)
+                                    .frame(width: 20)
+
+                                Text(cabin.cabin.displayName)
+                                    .font(.sfRounded(size: 13, weight: .medium))
+
+                                Spacer()
+
+                                Text("\(cabin.cost) pts")
+                                    .font(.sfRounded(size: 13, weight: .semibold))
+                                    .foregroundColor(.blue)
+
+                                Text("• \(cabin.seats) left")
+                                    .font(.sfRounded(size: 12))
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                    }
+                }
+
+                // Toggle button for all cabins (only show if multiple cabins available)
+                if award.allAvailableCabins().count > 1 {
+                    Button(action: {
+                        HapticManager.shared.impact(.soft)
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            showAllCabins.toggle()
+                        }
+                    }) {
+                        HStack {
+                            Text(showAllCabins ? "Show Less" : "Show All Cabins (\(award.allAvailableCabins().count))")
+                                .font(.sfRounded(size: 12, weight: .medium))
+                                .foregroundColor(.blue)
+                            Image(systemName: showAllCabins ? "chevron.up" : "chevron.down")
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundColor(.blue)
+                        }
+                    }
+                }
             }
+            .padding(16)
+            .glassEffect(.regular, in: .rect(cornerRadius: 14))
+            .shadow(color: Color.black.opacity(0.06), radius: 6, x: 0, y: 3)
         }
-        .padding(16)
-        .glassEffect(.regular, in: .rect(cornerRadius: 14))
-        .shadow(color: Color.black.opacity(0.06), radius: 6, x: 0, y: 3)
+        .buttonStyle(PlainButtonStyle())
     }
 
     private func formatDate(_ dateString: String) -> String {

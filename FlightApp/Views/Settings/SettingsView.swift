@@ -10,6 +10,7 @@ import SwiftUI
 /// Settings button that displays a context menu with Liquid Glass effects
 struct SettingsButton: View {
     @StateObject private var featureFlags = FeatureFlags.shared
+    @StateObject private var awardPreferences = AwardPreferences.shared
     @AppStorage("hapticIntensity") private var hapticIntensity: HapticIntensity = .aggressive
 
     var body: some View {
@@ -35,10 +36,76 @@ struct SettingsButton: View {
                 Label("Haptic: \(hapticIntensity.displayName)", systemImage: "waveform")
             }
 
-            // Features Section
-            Section {
+            // Award Search Settings
+            Section("Award Search") {
                 Toggle(isOn: $featureFlags.isSeatsAeroEnabled) {
-                    Label("Award Search", systemImage: "star.fill")
+                    Label("Enable Award Search", systemImage: "star.fill")
+                }
+
+                if featureFlags.isSeatsAeroEnabled {
+                    // Default search date range
+                    Menu {
+                        ForEach([7, 30, 60, 90], id: \.self) { days in
+                            Button {
+                                HapticManager.shared.impact(.soft)
+                                awardPreferences.defaultDateRangeDays = days
+                            } label: {
+                                HStack {
+                                    Text("\(days) days")
+                                    if awardPreferences.defaultDateRangeDays == days {
+                                        Image(systemName: "checkmark")
+                                    }
+                                }
+                            }
+                        }
+                    } label: {
+                        Label("Default Range: \(awardPreferences.defaultDateRangeDays) days", systemImage: "calendar")
+                    }
+
+                    // Default cabin classes
+                    Menu {
+                        Button {
+                            HapticManager.shared.impact(.soft)
+                            awardPreferences.defaultCabins = Set(CabinClass.allCases)
+                        } label: {
+                            HStack {
+                                Text("All Cabins")
+                                if awardPreferences.defaultCabins.count == CabinClass.allCases.count {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+
+                        Button {
+                            HapticManager.shared.impact(.soft)
+                            awardPreferences.defaultCabins = [.business, .first]
+                        } label: {
+                            HStack {
+                                Text("Premium Only")
+                                if awardPreferences.defaultCabins == [.business, .first] {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+
+                        Button {
+                            HapticManager.shared.impact(.soft)
+                            awardPreferences.defaultCabins = [.economy, .premiumEconomy]
+                        } label: {
+                            HStack {
+                                Text("Economy Only")
+                                if awardPreferences.defaultCabins == [.economy, .premiumEconomy] {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+                    } label: {
+                        Label("Default Cabins", systemImage: "airplane.circle")
+                    }
+
+                    Toggle(isOn: $awardPreferences.showAllCabinsInResults) {
+                        Label("Show All Cabins in Results", systemImage: "list.bullet")
+                    }
                 }
             }
 
@@ -47,12 +114,10 @@ struct SettingsButton: View {
                 Label("Version 0.1", systemImage: "info.circle")
             }
         } label: {
-            // Liquid Glass button design
+            // Simple button without any glass effects
             Image(systemName: "gearshape.fill")
                 .font(.system(size: 20))
                 .foregroundColor(.primary)
-                .frame(width: 40, height: 40)
-                .glassEffect(.regular.interactive(), in: .circle)
         }
     }
 }

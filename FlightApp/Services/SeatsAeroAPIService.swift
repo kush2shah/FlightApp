@@ -105,9 +105,9 @@ class SeatsAeroAPIService {
             queryItems.append(URLQueryItem(name: "sources", value: sources))
         }
 
-        // Default to business/first class, take top 100 results
+        // Default to all cabin classes if not specified, take top 100 results
         if cabins == nil {
-            queryItems.append(URLQueryItem(name: "cabins", value: "business,first"))
+            queryItems.append(URLQueryItem(name: "cabins", value: "economy,premium,business,first"))
         }
         queryItems.append(URLQueryItem(name: "take", value: "100"))
         queryItems.append(URLQueryItem(name: "order_by", value: "lowest_mileage"))
@@ -121,27 +121,39 @@ class SeatsAeroAPIService {
         var request = URLRequest(url: url)
         request.setValue(apiKey, forHTTPHeaderField: "Partner-Authorization")
 
-        print("🎫 Fetching award availability: \(origin) → \(destination)")
+        print("🎫 [SEATS.AERO] Fetching award availability: \(origin) → \(destination)")
+        print("🔗 [SEATS.AERO] Request URL: \(url.absoluteString)")
+        print("🔑 [SEATS.AERO] API Key present: \(!apiKey.isEmpty)")
 
         do {
             let (data, urlResponse) = try await URLSession.shared.data(for: request)
 
             guard let httpResponse = urlResponse as? HTTPURLResponse else {
+                print("❌ [SEATS.AERO] Invalid response type")
                 throw SeatsAeroAPIError.invalidResponse
             }
 
-            print("📡 Seats.aero Response Status: \(httpResponse.statusCode)")
+            print("📡 [SEATS.AERO] Response Status: \(httpResponse.statusCode)")
 
             // Handle error responses
             guard (200...299).contains(httpResponse.statusCode) else {
+                // Try to decode error message from response
+                if let errorString = String(data: data, encoding: .utf8) {
+                    print("📄 [SEATS.AERO] Error response body: \(errorString)")
+                }
+
                 switch httpResponse.statusCode {
                 case 401:
+                    print("❌ [SEATS.AERO] Authentication failed (401)")
                     throw SeatsAeroAPIError.unauthorized
                 case 429:
+                    print("⚠️ [SEATS.AERO] Rate limit exceeded (429)")
                     throw SeatsAeroAPIError.rateLimitExceeded
                 case 400:
+                    print("ℹ️ [SEATS.AERO] No results found (400)")
                     throw SeatsAeroAPIError.noResultsFound
                 default:
+                    print("❌ [SEATS.AERO] Server error (\(httpResponse.statusCode))")
                     throw SeatsAeroAPIError.serverError(httpResponse.statusCode)
                 }
             }
@@ -149,7 +161,7 @@ class SeatsAeroAPIService {
             let decoder = JSONDecoder()
             let response = try decoder.decode(SeatsAeroSearchResponse.self, from: data)
 
-            print("✅ Found \(response.data.count) award options")
+            print("✅ [SEATS.AERO] Successfully decoded \(response.data.count) award options")
 
             return response
         } catch let error as SeatsAeroAPIError {
@@ -233,5 +245,127 @@ struct AwardAvailability: Codable, Identifiable {
             return ("Economy", cost, seats)
         }
         return nil
+    }
+
+    /// Get all available cabins with details
+    func allAvailableCabins() -> [(cabin: CabinClass, cost: String, seats: Int)] {
+        var cabins: [(cabin: CabinClass, cost: String, seats: Int)] = []
+
+        if let fAvailable = fAvailable, fAvailable, let cost = fMileageCost, let seats = fRemainingSeats {
+            cabins.append((CabinClass.first, cost, seats))
+        }
+        if let jAvailable = jAvailable, jAvailable, let cost = jMileageCost, let seats = jRemainingSeats {
+            cabins.append((CabinClass.business, cost, seats))
+        }
+        if let wAvailable = wAvailable, wAvailable, let cost = wMileageCost, let seats = wRemainingSeats {
+            cabins.append((CabinClass.premiumEconomy, cost, seats))
+        }
+        if let yAvailable = yAvailable, yAvailable, let cost = yMileageCost, let seats = yRemainingSeats {
+            cabins.append((CabinClass.economy, cost, seats))
+        }
+
+        return cabins
+    }
+
+    /// Check if a specific cabin is available
+    func isCabinAvailable(_ cabin: CabinClass) -> Bool {
+        switch cabin {
+        case .first:
+            return fAvailable == true
+        case .business:
+            return jAvailable == true
+        case .premiumEconomy:
+            return wAvailable == true
+        case .economy:
+            return yAvailable == true
+        }
+    }
+
+    /// Get mileage cost for specific cabin
+    func getMileageCost(for cabin: CabinClass) -> String? {
+        switch cabin {
+        case .first:
+            return fMileageCost
+        case .business:
+            return jMileageCost
+        case .premiumEconomy:
+            return wMileageCost
+        case .economy:
+            return yMileageCost
+        }
+    }
+
+    /// Get remaining seats for specific cabin
+    func getRemainingSeats(for cabin: CabinClass) -> Int? {
+        switch cabin {
+        case .first:
+            return fRemainingSeats
+        case .business:
+            return jRemainingSeats
+        case .premiumEconomy:
+            return wRemainingSeats
+        case .economy:
+            return yRemainingSeats
+        }
+    }
+
+    /// Parse date from string format
+    var parsedDate: Date? {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.date(from: date)
+    }
+
+    /// Calculate value score for smart recommendations
+    /// Higher score = better value (considers cabin quality, availability, cost)
+    func valueScore() -> Double {
+        guard let best = bestAvailableCabin() else { return 0 }
+
+        // Parse mileage cost (remove commas and convert to int)
+        let costString = best.cost.replacingOccurrences(of: ",", with: "")
+        guard let cost = Double(costString), cost > 0 else { return 0 }
+
+        // Cabin quality multiplier
+        let cabinMultiplier: Double
+        switch best.cabin {
+        case "First": cabinMultiplier = 4.0
+        case "Business": cabinMultiplier = 3.0
+        case "Premium Economy": cabinMultiplier = 2.0
+        case "Economy": cabinMultiplier = 1.0
+        default: cabinMultiplier = 1.0
+        }
+
+        // Availability multiplier (more seats = better)
+        let availabilityMultiplier = min(Double(best.seats) / 4.0, 2.0)
+
+        // Value score: (cabin quality × availability) / cost
+        // Lower cost and higher cabin/availability = higher score
+        return (cabinMultiplier * availabilityMultiplier * 100000) / cost
+    }
+
+    /// Generate booking URL for this award
+    func generateBookingURL(origin: String, destination: String) -> URL? {
+        guard let date = parsedDate,
+              let airlineCode = AwardBookingService.shared.extractAirlineCode(from: source),
+              let best = bestAvailableCabin() else {
+            return nil
+        }
+
+        let cabin: CabinClass
+        switch best.cabin {
+        case "First": cabin = .first
+        case "Business": cabin = .business
+        case "Premium Economy": cabin = .premiumEconomy
+        case "Economy": cabin = .economy
+        default: cabin = .economy
+        }
+
+        return AwardBookingService.shared.generateBookingURL(
+            airline: airlineCode,
+            origin: origin,
+            destination: destination,
+            date: date,
+            cabinClass: cabin
+        )
     }
 }

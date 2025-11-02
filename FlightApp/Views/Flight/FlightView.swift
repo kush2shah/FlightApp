@@ -22,24 +22,23 @@ struct FlightView: View {
     }
     
     var body: some View {
-        NavigationStack {
-            ZStack {
-                // Liquid glass background layer
-                Color.clear
-                    .background(.ultraThinMaterial)
-                    .ignoresSafeArea()
+        ZStack {
+            // Liquid glass background layer
+            Color.clear
+                .background(.ultraThinMaterial)
+                .ignoresSafeArea()
 
-                ScrollView {
-                    VStack(spacing: 0) {
-                        if let flight = viewModel.currentFlight {
-                        // Hero section with flight number and route
-                        FlightHeroSection(flight: flight)
-                            .padding(.horizontal)
-                            .padding(.top)
+            ScrollView {
+                VStack(spacing: 0) {
+                    if let flight = viewModel.currentFlight {
+                    // Hero section with flight number and route
+                    FlightHeroSection(flight: flight)
+                        .padding(.horizontal)
+                        .padding(.top)
 
-                        // Route map - full width, no padding
-                        FlightRouteMapView(flight: flight)
-                            .padding(.top, 20)
+                    // Route map - full width, no padding
+                    FlightRouteMapView(flight: flight)
+                        .padding(.top, 20)
 
                         VStack(spacing: 20) {
                             // Time and progress information
@@ -78,40 +77,42 @@ struct FlightView: View {
                 }
             }
         }
-        .background(Color(.systemGroupedBackground))
-        .navigationTitle("Flight \(flightNumber)")
+        .navigationTitle("Flight Details")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(.hidden, for: .navigationBar)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                SettingsButton()
+            }
+        }
         .sheet(isPresented: $viewModel.showFlightSelection) {
-                FlightSelectionSheet(
-                    flights: viewModel.availableFlights,
-                    onSelect: viewModel.selectFlight,
-                    onDateChange: { newDate in
-                        viewModel.searchFlightForDate(newDate)
-                    }
-                )
-                .presentationDetents([.medium, .large])
-                .presentationDragIndicator(.visible)
-                .presentationBackgroundInteraction(.enabled)
-            }
-            .onAppear {
-                viewModel.skipFlightSelection = skipFlightSelection
-                viewModel.searchFlight(flightNumber: flightNumber, faFlightId: faFlightId)
-
-                // Check for current flight and fetch airline info if needed
-                if viewModel.currentFlight != nil && viewModel.airlineProfile == nil {
-                    viewModel.fetchAirlineInfo()
+            FlightSelectionSheet(
+                flights: viewModel.availableFlights,
+                onSelect: viewModel.selectFlight,
+                onDateChange: { newDate in
+                    viewModel.searchFlightForDate(newDate)
                 }
-            }
-            // Use a different approach to respond to flight changes
-            .onChange(of: viewModel.currentFlight?.faFlightId) { oldValue, newValue in
-                if viewModel.currentFlight != nil {
-                    viewModel.fetchAirlineInfo()
+            )
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+            .presentationBackgroundInteraction(.enabled)
+        }
+        .onAppear {
+            viewModel.skipFlightSelection = skipFlightSelection
+            viewModel.searchFlight(flightNumber: flightNumber, faFlightId: faFlightId)
 
-                    // Trigger flurry haptic when flight loads for the first time
-                    if oldValue == nil && newValue != nil {
-                        HapticManager.shared.celebrationFlurry()
-                    }
+            // Check for current flight and fetch airline info if needed
+            if viewModel.currentFlight != nil && viewModel.airlineProfile == nil {
+                viewModel.fetchAirlineInfo()
+            }
+        }
+        // Use a different approach to respond to flight changes
+        .onChange(of: viewModel.currentFlight?.faFlightId) { oldValue, newValue in
+            if viewModel.currentFlight != nil {
+                viewModel.fetchAirlineInfo()
+
+                // Trigger flurry haptic when flight loads for the first time
+                if oldValue == nil && newValue != nil {
+                    HapticManager.shared.celebrationFlurry()
                 }
             }
         }
@@ -121,12 +122,30 @@ struct FlightView: View {
     private var airlineProfileSection: some View {
         Group {
             if viewModel.isLoadingAirline {
-                HStack {
-                    Spacer()
+                VStack(spacing: 16) {
+                    // Small loading indicator that matches the design but is compact for inline use
+                    Circle()
+                        .fill(Color.blue.opacity(0.1))
+                        .frame(width: 48, height: 48)
+                        .overlay(
+                            Image(systemName: "building.2")
+                                .font(.system(size: 20))
+                                .foregroundColor(.blue)
+                                .symbolEffect(.pulse, options: .repeating)
+                        )
+                    
+                    Text("Loading airline information...")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                    
+                    // Progress indicator to show active loading
                     ProgressView()
-                        .padding()
-                    Spacer()
+                        .tint(.blue)
+                        .scaleEffect(0.9)
                 }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 24)
+                .glassEffect(.regular, in: .rect(cornerRadius: 12))
             } else if let airline = viewModel.airlineProfile {
                 AirlineProfileView(airline: airline)
             } else if viewModel.airlineError != nil {
@@ -160,7 +179,6 @@ struct FlightView: View {
             }
         }
     }
-    
 }
 
 struct FlightSelectionSheet: View {
@@ -212,14 +230,31 @@ struct FlightSelectionSheet: View {
                 LazyVStack(spacing: 16) {
                     // Loading state
                     if isSearching {
-                        VStack(spacing: 20) {
-                            ProgressView()
-                                .scaleEffect(1.5)
-                                .padding(.top, 40)
+                        VStack(spacing: 24) {
+                            // Loading Icon - matches error view pattern
+                            Circle()
+                                .fill(Color.blue.opacity(0.1))
+                                .frame(width: 80, height: 80)
+                                .overlay(
+                                    Image(systemName: "airplane")
+                                        .font(.system(size: 32))
+                                        .foregroundColor(.blue)
+                                        .symbolEffect(.pulse, options: .repeating)
+                                )
 
-                            Text("Searching for flights...")
-                                .font(.headline)
-                                .foregroundColor(.secondary)
+                            VStack(spacing: 8) {
+                                Text("Searching for Flights")
+                                    .font(.title2)
+                                    .fontWeight(.semibold)
+                                Text("Loading available flights...")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                                    .multilineTextAlignment(.center)
+                            }
+
+                            // Progress indicator to show active loading
+                            ProgressView()
+                                .tint(.blue)
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 60)
@@ -261,6 +296,7 @@ struct FlightSelectionSheet: View {
                                     dismiss()
                                 } label: {
                                     EnhancedFlightSelectionCard(flight: flight)
+                                        .contentShape(Rectangle())
                                 }
                                 .buttonStyle(PlainButtonStyle())
                             }

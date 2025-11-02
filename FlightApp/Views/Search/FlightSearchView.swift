@@ -1,5 +1,5 @@
 //
-//  FlightSearchView_Redesigned.swift
+//  FlightSearchView.swift
 //  FlightApp
 //
 //  Created by Kush Shah on 10/12/25.
@@ -7,7 +7,7 @@
 
 import SwiftUI
 
-struct FlightSearchView_Redesigned: View {
+struct FlightSearchView: View {
     @State private var searchText = ""
     @State private var selectedFlightNumber: IdentifiableString?
     @State private var selectedRoute: RouteIdentifier?
@@ -33,7 +33,7 @@ struct FlightSearchView_Redesigned: View {
                     VStack(spacing: 0) {
                         // Header
                         VStack(spacing: 12) {
-                            Text("Track Any Flight")
+                            Text("Track a flight")
                                 .font(.sfRounded(size: 34, weight: .bold))
                                 .foregroundColor(.primary)
 
@@ -122,7 +122,9 @@ struct FlightSearchView_Redesigned: View {
             }
             .sheet(item: $selectedFlightNumber) { identifiableFlightNumber in
                 FlightView(flightNumber: identifiableFlightNumber.value, faFlightId: identifiableFlightNumber.faFlightId, skipFlightSelection: true)
+                    .presentationDetents([.medium, .large])
                     .presentationDragIndicator(.visible)
+                    .presentationBackgroundInteraction(.enabled)
                     .onAppear {
                         haptics.sheetOpened()
                     }
@@ -136,6 +138,9 @@ struct FlightSearchView_Redesigned: View {
             }
             .sheet(item: $selectedRoute) { route in
                 RouteView(origin: route.origin, destination: route.destination)
+                    .presentationDetents([.medium, .large])
+                    .presentationDragIndicator(.visible)
+                    .presentationBackgroundInteraction(.enabled)
                     .onAppear {
                         haptics.sheetOpened()
                     }
@@ -784,5 +789,5 @@ struct RouteIdentifier: Identifiable {
 }
 
 #Preview {
-    FlightSearchView_Redesigned()
+    FlightSearchView()
 }

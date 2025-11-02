@@ -40,7 +40,7 @@ struct FlightErrorView: View {
             VStack(alignment: .leading, spacing: 16) {
                 Text("Try:")
                     .font(.headline)
-                
+
                 VStack(alignment: .leading, spacing: 12) {
                     SuggestionRow(
                         icon: "clock.arrow.circlepath",
@@ -53,30 +53,38 @@ struct FlightErrorView: View {
                 }
             }
             .padding()
-            .background(Color(.systemBackground))
-            .cornerRadius(16)
-            .shadow(radius: 5)
+            .glassEffect(.regular, in: .rect(cornerRadius: 16))
+            .shadow(color: Color.black.opacity(0.06), radius: 6, x: 0, y: 3)
             
             // Action Buttons
             VStack(spacing: 12) {
                 Button(action: onRetry) {
-                    Text("Try Again")
-                        .font(.headline)
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.blue)
-                        .cornerRadius(12)
+                    HStack {
+                        Image(systemName: "arrow.clockwise")
+                        Text("Try Again")
+                    }
+                    .font(.sfRounded(size: 16, weight: .semibold))
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(
+                        LinearGradient(
+                            colors: [Color.blue, Color.blue.opacity(0.8)],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .cornerRadius(12)
+                    .shadow(color: Color.blue.opacity(0.3), radius: 8, x: 0, y: 4)
                 }
-                
+
                 Button(action: onBack) {
                     Text("Back to Search")
-                        .font(.headline)
+                        .font(.sfRounded(size: 16, weight: .semibold))
                         .foregroundColor(.blue)
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(Color.blue.opacity(0.1))
-                        .cornerRadius(12)
+                        .glassEffect(.regular, in: .rect(cornerRadius: 12))
                 }
             }
         }
