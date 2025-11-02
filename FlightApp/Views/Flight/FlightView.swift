@@ -76,11 +76,13 @@ struct FlightView: View {
                         .padding()
                     }
                 }
-                }
             }
-            .navigationTitle("Flight \(flightNumber)")
-            .navigationBarTitleDisplayMode(.inline)
-            .sheet(isPresented: $viewModel.showFlightSelection) {
+        }
+        .background(Color(.systemGroupedBackground))
+        .navigationTitle("Flight \(flightNumber)")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(.hidden, for: .navigationBar)
+        .sheet(isPresented: $viewModel.showFlightSelection) {
                 FlightSelectionSheet(
                     flights: viewModel.availableFlights,
                     onSelect: viewModel.selectFlight,
@@ -92,24 +94,24 @@ struct FlightView: View {
                 .presentationDragIndicator(.visible)
                 .presentationBackgroundInteraction(.enabled)
             }
-        }
-        .onAppear {
-            viewModel.skipFlightSelection = skipFlightSelection
-            viewModel.searchFlight(flightNumber: flightNumber, faFlightId: faFlightId)
+            .onAppear {
+                viewModel.skipFlightSelection = skipFlightSelection
+                viewModel.searchFlight(flightNumber: flightNumber, faFlightId: faFlightId)
 
-            // Check for current flight and fetch airline info if needed
-            if viewModel.currentFlight != nil && viewModel.airlineProfile == nil {
-                viewModel.fetchAirlineInfo()
+                // Check for current flight and fetch airline info if needed
+                if viewModel.currentFlight != nil && viewModel.airlineProfile == nil {
+                    viewModel.fetchAirlineInfo()
+                }
             }
-        }
-        // Use a different approach to respond to flight changes
-        .onChange(of: viewModel.currentFlight?.faFlightId) { oldValue, newValue in
-            if viewModel.currentFlight != nil {
-                viewModel.fetchAirlineInfo()
+            // Use a different approach to respond to flight changes
+            .onChange(of: viewModel.currentFlight?.faFlightId) { oldValue, newValue in
+                if viewModel.currentFlight != nil {
+                    viewModel.fetchAirlineInfo()
 
-                // Trigger flurry haptic when flight loads for the first time
-                if oldValue == nil && newValue != nil {
-                    HapticManager.shared.celebrationFlurry()
+                    // Trigger flurry haptic when flight loads for the first time
+                    if oldValue == nil && newValue != nil {
+                        HapticManager.shared.celebrationFlurry()
+                    }
                 }
             }
         }
@@ -150,12 +152,11 @@ struct FlightView: View {
                         Text(airlineCode)
                             .font(.headline)
                     }
-                    
+
                     Spacer()
                 }
                 .padding()
-                .background(Color(.systemGray6))
-                .cornerRadius(12)
+                .glassEffect(.regular, in: .rect(cornerRadius: 12))
             }
         }
     }
@@ -165,6 +166,7 @@ struct FlightView: View {
 struct FlightSelectionSheet: View {
     @Environment(\.dismiss) var dismiss
     let flights: [AeroFlight]
+    var isSearching: Bool = false
     let onSelect: (AeroFlight) -> Void
     let onDateChange: ((Date) -> Void)?
 
@@ -178,7 +180,7 @@ struct FlightSelectionSheet: View {
             return firstDate < secondDate
         }
         
-        let grouped = Dictionary(grouping: sorted) { flight in
+        let grouped: [String: [AeroFlight]] = Dictionary(grouping: sorted) { flight -> String in
             guard let scheduledOut = flight.scheduledOut,
                   let date = ISO8601DateFormatter().date(from: scheduledOut),
                   let timezone = TimeZone(identifier: flight.origin.timezone ?? "UTC") else {
@@ -208,8 +210,22 @@ struct FlightSelectionSheet: View {
         NavigationStack {
             ScrollView {
                 LazyVStack(spacing: 16) {
+                    // Loading state
+                    if isSearching {
+                        VStack(spacing: 20) {
+                            ProgressView()
+                                .scaleEffect(1.5)
+                                .padding(.top, 40)
+
+                            Text("Searching for flights...")
+                                .font(.headline)
+                                .foregroundColor(.secondary)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 60)
+                    }
                     // Hint for single flight results
-                    if flights.count == 1 {
+                    else if flights.count == 1 {
                         HStack(spacing: 8) {
                             Image(systemName: "arrow.down")
                                 .font(.caption)

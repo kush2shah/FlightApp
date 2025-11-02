@@ -16,7 +16,6 @@ struct FlightSearchView_Redesigned: View {
     @State private var isSearching = false
     @State private var searchError: String? = nil
     @State private var showErrorAlert = false
-    @State private var showSettings = false
     @State private var lastSearchedFlightNumber: String = ""
     @State private var isSearchExpanded = false
     @FocusState private var isSearchFocused: Bool
@@ -65,22 +64,13 @@ struct FlightSearchView_Redesigned: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Button(action: {
-                        haptics.impact(.medium)
-                        showSettings = true
-                    }) {
-                        Image(systemName: "gearshape")
-                            .font(.system(size: 18))
-                            .foregroundColor(.secondary)
-                    }
+                    SettingsButton()
                 }
-            }
-            .sheet(isPresented: $showSettings) {
-                SettingsView()
             }
             .sheet(isPresented: $showFlightSelectionSheet) {
                 FlightSelectionSheet(
                     flights: availableFlights,
+                    isSearching: isSearching,
                     onSelect: { selectedFlight in
                         selectedFlightNumber = IdentifiableString(value: selectedFlight.ident, faFlightId: selectedFlight.faFlightId)
                         isSearchFocused = false
@@ -120,7 +110,7 @@ struct FlightSearchView_Redesigned: View {
                         searchByFlightNumber(lastSearchedFlightNumber, date: newDate)
                     }
                 )
-                .presentationDetents([.medium, .large])
+                .presentationDetents(isSearching || availableFlights.isEmpty ? [.medium] : [.medium, .large])
                 .presentationDragIndicator(.visible)
                 .presentationBackgroundInteraction(.enabled)
                 .onAppear {
@@ -407,6 +397,11 @@ struct FlightSearchView_Redesigned: View {
     private func searchByFlightNumber(_ flightNumber: String, date: Date? = nil) {
         lastSearchedFlightNumber = flightNumber
 
+        // Show sheet immediately with loading state
+        showFlightSelectionSheet = true
+        isSearching = true
+        availableFlights = []
+
         Task {
             do {
                 let flights = try await AeroAPIService.shared.getFlightInfo(flightNumber, startDate: date)
@@ -415,7 +410,6 @@ struct FlightSearchView_Redesigned: View {
                     availableFlights = flights
 
                     if !flights.isEmpty {
-                        showFlightSelectionSheet = true
                         haptics.notificationOccurred(.success)
                     }
 
@@ -426,6 +420,7 @@ struct FlightSearchView_Redesigned: View {
                 await MainActor.run {
                     searchError = error.localizedDescription
                     showErrorAlert = true
+                    showFlightSelectionSheet = false
                     isSearching = false
                     haptics.notificationOccurred(.error)
                 }

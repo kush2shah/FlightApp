@@ -81,11 +81,12 @@ struct RouteView: View {
     private var routeContentView: some View {
         VStack(spacing: 0) {
             // Route map (hero section) with stats overlay
-            if let primaryRoute = viewModel.primaryRoute {
+            // Show map even without IFR route data - great circle is calculated independently
+            if viewModel.originAirport != nil && viewModel.destinationAirport != nil {
                 RouteMapSection(
                     origin: viewModel.originAirport,
                     destination: viewModel.destinationAirport,
-                    route: primaryRoute
+                    route: viewModel.primaryRoute
                 )
                 .frame(height: 400)
             }
@@ -150,8 +151,11 @@ struct RouteView: View {
                         selectedFlight = IdentifiableString(value: flight.ident, faFlightId: flight.faFlightId)
                     }) {
                         FlightRowCard(flight: flight)
+                            .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 16))
+                            .shadow(color: Color.black.opacity(0.06), radius: 6, x: 0, y: 3)
+                            .contentShape(Rectangle())
                     }
-                    .buttonStyle(PlainButtonStyle())
+                    .buttonStyle(.plain)
                 }
             }
             .padding(.horizontal)
@@ -219,7 +223,7 @@ struct RouteView: View {
 struct RouteMapSection: View {
     let origin: AeroAirport?
     let destination: AeroAirport?
-    let route: IFRRouteInfo
+    let route: IFRRouteInfo?
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -236,17 +240,20 @@ struct RouteMapSection: View {
 
                 // Stats overlay with glass effect
                 HStack(spacing: 24) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Distance")
-                            .font(.sfRounded(size: 12, weight: .medium))
-                            .foregroundColor(.secondary)
-                        Text(route.routeDistance)
-                            .font(.sfRounded(size: 18, weight: .bold))
-                            .foregroundColor(.primary)
-                    }
+                    // Only show distance if we have route data
+                    if let route = route {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Distance")
+                                .font(.sfRounded(size: 12, weight: .medium))
+                                .foregroundColor(.secondary)
+                            Text(route.routeDistance)
+                                .font(.sfRounded(size: 18, weight: .bold))
+                                .foregroundColor(.primary)
+                        }
 
-                    Divider()
-                        .frame(height: 30)
+                        Divider()
+                            .frame(height: 30)
+                    }
 
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Route")
@@ -268,8 +275,7 @@ struct RouteMapSection: View {
                 }
                 .padding(.horizontal, 20)
                 .padding(.vertical, 16)
-                .background(.ultraThinMaterial)
-                .cornerRadius(16)
+                .glassEffect(.regular, in: .rect(cornerRadius: 16))
                 .shadow(color: Color.black.opacity(0.1), radius: 10, x: 0, y: 4)
                 .padding(.horizontal, 20)
                 .padding(.bottom, 20)
@@ -559,9 +565,6 @@ struct FlightRowCard: View {
             }
         }
         .padding(18)
-        .background(Color(.secondarySystemBackground))
-        .cornerRadius(16)
-        .shadow(color: Color.black.opacity(0.08), radius: 8, x: 0, y: 4)
     }
 
     private var statusColor: Color {
@@ -651,8 +654,7 @@ struct AwardRowCard: View {
             }
         }
         .padding(16)
-        .background(Color(.secondarySystemBackground))
-        .cornerRadius(14)
+        .glassEffect(.regular, in: .rect(cornerRadius: 14))
         .shadow(color: Color.black.opacity(0.06), radius: 6, x: 0, y: 3)
     }
 

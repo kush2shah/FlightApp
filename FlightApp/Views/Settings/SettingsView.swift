@@ -7,62 +7,68 @@
 
 import SwiftUI
 
-struct SettingsView: View {
+/// Settings button that displays a context menu with Liquid Glass effects
+struct SettingsButton: View {
     @StateObject private var featureFlags = FeatureFlags.shared
-    @Environment(\.dismiss) private var dismiss
     @AppStorage("hapticIntensity") private var hapticIntensity: HapticIntensity = .aggressive
 
     var body: some View {
-        NavigationView {
-            Form {
-                Section {
-                    Toggle("Award Search", isOn: $featureFlags.isSeatsAeroEnabled)
-                } header: {
-                    Text("Features")
-                } footer: {
-                    Text("Enable award availability search powered by Seats.aero. Disable this if the service becomes unavailable or you prefer flight tracking only.")
-                }
-
-                Section {
-                    Picker("Haptic Intensity", selection: $hapticIntensity) {
-                        ForEach(HapticIntensity.allCases) { intensity in
-                            Text(intensity.displayName).tag(intensity)
+        Menu {
+            // Haptic Intensity Picker
+            Menu {
+                ForEach(HapticIntensity.allCases) { intensity in
+                    Button {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                            hapticIntensity = intensity
+                            HapticManager.shared.impact(.medium, intensity: intensity.multiplier)
+                        }
+                    } label: {
+                        HStack {
+                            Text(intensity.displayName)
+                            if hapticIntensity == intensity {
+                                Image(systemName: "checkmark")
+                            }
                         }
                     }
-                    .onChange(of: hapticIntensity) { _, newValue in
-                        // Provide haptic feedback when changing the setting
-                        HapticManager.shared.impact(.medium, intensity: newValue.multiplier)
-                    }
-                } header: {
-                    Text("Haptics")
-                } footer: {
-                    Text("Control the intensity of haptic feedback throughout the app. Aggressive provides the most tactile experience.")
                 }
+            } label: {
+                Label("Haptic: \(hapticIntensity.displayName)", systemImage: "waveform")
+            }
 
-                Section {
-                    HStack {
-                        Text("Version")
-                        Spacer()
-                        Text("0.1")
-                            .foregroundColor(.secondary)
-                    }
-                } header: {
-                    Text("About")
+            // Features Section
+            Section {
+                Toggle(isOn: $featureFlags.isSeatsAeroEnabled) {
+                    Label("Award Search", systemImage: "star.fill")
                 }
             }
-            .navigationTitle("Settings")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
-                        dismiss()
-                    }
-                }
+
+            // About Section
+            Section {
+                Label("Version 0.1", systemImage: "info.circle")
             }
+        } label: {
+            // Liquid Glass button design
+            Image(systemName: "gearshape.fill")
+                .font(.system(size: 20))
+                .foregroundColor(.primary)
+                .frame(width: 40, height: 40)
+                .glassEffect(.regular.interactive(), in: .circle)
         }
     }
 }
 
 #Preview {
-    SettingsView()
+    NavigationStack {
+        VStack {
+            Spacer()
+            Text("Flight Tracker")
+                .font(.largeTitle)
+            Spacer()
+        }
+        .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                SettingsButton()
+            }
+        }
+    }
 }
