@@ -33,43 +33,37 @@ struct AirlineProfile {
 
 struct AirlineProfileView: View {
     let airline: AirlineProfile
-    
+
+    private var airlineCode: String? {
+        airline.iataCode ?? airline.icaoCode
+    }
+
+    private var brandColors: AirlineBrandColors? {
+        AirlineColorService.shared.getBrandColors(for: airlineCode)
+    }
+
     var body: some View {
-        VStack(spacing: 0) {
-            // Gradient header that uses the airline's theme colors
-            header
-                .frame(height: 8)
-            
-            // Main content with airline information
-            content
-        }
-        .cornerRadius(16)
-        .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
-    }
-    
-    private var header: some View {
-        RoundedRectangle(cornerRadius: 16)
-            .fill(airline.themeGradient)
-            .frame(maxWidth: .infinity)
-    }
-    
-    private var content: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            // Airline name and code
-            HStack {
+        VStack(alignment: .leading, spacing: 16) {
+            // Header with logo and airline name
+            HStack(spacing: 16) {
+                // Airline logo
+                if let code = airlineCode {
+                    AirlineLogoView(iataCode: code, size: 56)
+                }
+
                 VStack(alignment: .leading, spacing: 4) {
                     Text(airline.name)
-                        .font(.system(.headline, design: .rounded))
-                    
+                        .font(.sfRounded(size: 20, weight: .bold))
+
                     if let shortName = airline.shortName, shortName != airline.name {
                         Text(shortName)
-                            .font(.system(.subheadline, design: .rounded))
+                            .font(.sfRounded(size: 14))
                             .foregroundColor(.secondary)
                     }
                 }
-                
+
                 Spacer()
-                
+
                 codeDisplay
             }
             
@@ -107,26 +101,22 @@ struct AirlineProfileView: View {
                 }
             }
         }
-        .padding()
-        .background(Color(.systemBackground))
+        .padding(20)
+        .brandedGlassEffect(colors: brandColors, cornerRadius: 20, intensity: 0.22)
+        .shadow(color: Color.black.opacity(0.1), radius: 15, x: 0, y: 5)
     }
     
     private var codeDisplay: some View {
         VStack(alignment: .trailing, spacing: 4) {
             if let iataCode = airline.iataCode {
                 Text(iataCode)
-                    .font(.system(.headline, design: .monospaced))
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(
-                        RoundedRectangle(cornerRadius: 4)
-                            .fill(airline.themeGradient.opacity(0.2))
-                    )
+                    .font(.system(size: 16, weight: .bold, design: .monospaced))
+                    .foregroundColor(.primary)
             }
-            
+
             if let icaoCode = airline.icaoCode {
                 Text(icaoCode)
-                    .font(.system(.caption, design: .monospaced))
+                    .font(.system(size: 12, design: .monospaced))
                     .foregroundColor(.secondary)
             }
         }

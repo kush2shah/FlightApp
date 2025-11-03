@@ -22,18 +22,23 @@ struct FlightView: View {
     }
     
     var body: some View {
-        NavigationStack {
+        ZStack {
+            // Liquid glass background layer
+            Color.clear
+                .background(.ultraThinMaterial)
+                .ignoresSafeArea()
+
             ScrollView {
                 VStack(spacing: 0) {
                     if let flight = viewModel.currentFlight {
-                        // Hero section with flight number and route
-                        FlightHeroSection(flight: flight)
-                            .padding(.horizontal)
-                            .padding(.top)
+                    // Hero section with flight number and route
+                    FlightHeroSection(flight: flight)
+                        .padding(.horizontal)
+                        .padding(.top)
 
-                        // Route map - full width, no padding
-                        FlightRouteMapView(flight: flight)
-                            .padding(.top, 20)
+                    // Route map - full width, no padding
+                    FlightRouteMapView(flight: flight)
+                        .padding(.top, 20)
 
                         VStack(spacing: 20) {
                             // Time and progress information
@@ -51,16 +56,6 @@ struct FlightView: View {
 
                             // Airline profile section
                             airlineProfileSection
-
-                            // Status view (if not cancelled)
-                            if !flight.cancelled {
-                                FlightStatusView(flight: flight)
-                            }
-
-                            // Additional flight details
-                            if !flight.cancelled {
-                                FlightDetailsSection(flight: flight)
-                            }
                         }
                         .padding()
                     } else if viewModel.isLoading {
@@ -81,20 +76,25 @@ struct FlightView: View {
                     }
                 }
             }
-            .navigationTitle("Flight \(flightNumber)")
-            .navigationBarTitleDisplayMode(.inline)
-            .sheet(isPresented: $viewModel.showFlightSelection) {
-                FlightSelectionSheet(
-                    flights: viewModel.availableFlights,
-                    onSelect: viewModel.selectFlight,
-                    onDateChange: { newDate in
-                        viewModel.searchFlightForDate(newDate)
-                    }
-                )
-                .presentationDetents([.medium, .large])
-                .presentationDragIndicator(.visible)
-                .presentationBackgroundInteraction(.enabled)
+        }
+        .navigationTitle("Flight Details")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                SettingsButton()
             }
+        }
+        .sheet(isPresented: $viewModel.showFlightSelection) {
+            FlightSelectionSheet(
+                flights: viewModel.availableFlights,
+                onSelect: viewModel.selectFlight,
+                onDateChange: { newDate in
+                    viewModel.searchFlightForDate(newDate)
+                }
+            )
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+            .presentationBackgroundInteraction(.enabled)
         }
         .onAppear {
             viewModel.skipFlightSelection = skipFlightSelection
@@ -106,9 +106,14 @@ struct FlightView: View {
             }
         }
         // Use a different approach to respond to flight changes
-        .onChange(of: viewModel.currentFlight?.faFlightId) { _ in
+        .onChange(of: viewModel.currentFlight?.faFlightId) { oldValue, newValue in
             if viewModel.currentFlight != nil {
                 viewModel.fetchAirlineInfo()
+
+                // Trigger flurry haptic when flight loads for the first time
+                if oldValue == nil && newValue != nil {
+                    HapticManager.shared.celebrationFlurry()
+                }
             }
         }
     }
@@ -117,12 +122,30 @@ struct FlightView: View {
     private var airlineProfileSection: some View {
         Group {
             if viewModel.isLoadingAirline {
-                HStack {
-                    Spacer()
+                VStack(spacing: 16) {
+                    // Small loading indicator that matches the design but is compact for inline use
+                    Circle()
+                        .fill(Color.blue.opacity(0.1))
+                        .frame(width: 48, height: 48)
+                        .overlay(
+                            Image(systemName: "building.2")
+                                .font(.system(size: 20))
+                                .foregroundColor(.blue)
+                                .symbolEffect(.pulse, options: .repeating)
+                        )
+                    
+                    Text("Loading airline information...")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                    
+                    // Progress indicator to show active loading
                     ProgressView()
-                        .padding()
-                    Spacer()
+                        .tint(.blue)
+                        .scaleEffect(0.9)
                 }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 24)
+                .glassEffect(.regular, in: .rect(cornerRadius: 12))
             } else if let airline = viewModel.airlineProfile {
                 AirlineProfileView(airline: airline)
             } else if viewModel.airlineError != nil {
@@ -148,21 +171,20 @@ struct FlightView: View {
                         Text(airlineCode)
                             .font(.headline)
                     }
-                    
+
                     Spacer()
                 }
                 .padding()
-                .background(Color(.systemGray6))
-                .cornerRadius(12)
+                .glassEffect(.regular, in: .rect(cornerRadius: 12))
             }
         }
     }
-    
 }
 
 struct FlightSelectionSheet: View {
     @Environment(\.dismiss) var dismiss
     let flights: [AeroFlight]
+    var isSearching: Bool = false
     let onSelect: (AeroFlight) -> Void
     let onDateChange: ((Date) -> Void)?
 
@@ -176,7 +198,7 @@ struct FlightSelectionSheet: View {
             return firstDate < secondDate
         }
         
-        let grouped = Dictionary(grouping: sorted) { flight in
+        let grouped: [String: [AeroFlight]] = Dictionary(grouping: sorted) { flight -> String in
             guard let scheduledOut = flight.scheduledOut,
                   let date = ISO8601DateFormatter().date(from: scheduledOut),
                   let timezone = TimeZone(identifier: flight.origin.timezone ?? "UTC") else {
@@ -206,8 +228,39 @@ struct FlightSelectionSheet: View {
         NavigationStack {
             ScrollView {
                 LazyVStack(spacing: 16) {
+                    // Loading state
+                    if isSearching {
+                        VStack(spacing: 24) {
+                            // Loading Icon - matches error view pattern
+                            Circle()
+                                .fill(Color.blue.opacity(0.1))
+                                .frame(width: 80, height: 80)
+                                .overlay(
+                                    Image(systemName: "airplane")
+                                        .font(.system(size: 32))
+                                        .foregroundColor(.blue)
+                                        .symbolEffect(.pulse, options: .repeating)
+                                )
+
+                            VStack(spacing: 8) {
+                                Text("Searching for Flights")
+                                    .font(.title2)
+                                    .fontWeight(.semibold)
+                                Text("Loading available flights...")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                                    .multilineTextAlignment(.center)
+                            }
+
+                            // Progress indicator to show active loading
+                            ProgressView()
+                                .tint(.blue)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 60)
+                    }
                     // Hint for single flight results
-                    if flights.count == 1 {
+                    else if flights.count == 1 {
                         HStack(spacing: 8) {
                             Image(systemName: "arrow.down")
                                 .font(.caption)
@@ -243,6 +296,7 @@ struct FlightSelectionSheet: View {
                                     dismiss()
                                 } label: {
                                     EnhancedFlightSelectionCard(flight: flight)
+                                        .contentShape(Rectangle())
                                 }
                                 .buttonStyle(PlainButtonStyle())
                             }
@@ -317,7 +371,8 @@ struct FlightSelectionSheet: View {
                             .multilineTextAlignment(.center)
                     }
                     .padding(20)
-                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                    .glassEffect(.regular, in: .rect(cornerRadius: 20))
+                    .shadow(color: Color.black.opacity(0.1), radius: 15, x: 0, y: 5)
                     .padding(.horizontal)
                     .padding(.bottom, 8)
                 }
@@ -351,8 +406,8 @@ struct EnhancedFlightSelectionCard: View {
         }
         
         if let departureDelay = flight.departureDelay, departureDelay > 0 {
-            let minutes = departureDelay / 60
-            return ("Delayed \(minutes)m", .orange)
+            let formattedTime = departureDelay.formattedDelay()
+            return ("Delayed \(formattedTime)", .orange)
         }
         
         if let scheduledOut = flight.scheduledOut,
@@ -416,8 +471,8 @@ struct EnhancedFlightSelectionCard: View {
             }
         }
         .padding()
-        .background(Color(.systemGray6))
-        .cornerRadius(12)
+        .glassEffect(.regular, in: .rect(cornerRadius: 16))
+        .shadow(color: Color.black.opacity(0.08), radius: 10, x: 0, y: 4)
     }
 }
 

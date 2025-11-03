@@ -34,14 +34,80 @@ struct PopularRouteStore {
     )
     
     static let routes: [PopularRoute] = [
+        // Ultra-long haul flagship routes
+        // Note: Only including flights without codeshare/shared flight numbers
+        // to ensure users see the exact flight they select
         PopularRoute(
-            flightNumber: "SQ23",
+            flightNumber: "SQ22",
             origin: "New York",
             destination: "Singapore",
             originCode: "JFK",
             destinationCode: "SIN",
             originFlag: "🇺🇸",
             destinationFlag: "🇸🇬"
+        ),
+        PopularRoute(
+            flightNumber: "QF12",
+            origin: "Sydney",
+            destination: "Los Angeles",
+            originCode: "SYD",
+            destinationCode: "LAX",
+            originFlag: "🇦🇺",
+            destinationFlag: "🇺🇸"
+        ),
+        PopularRoute(
+            flightNumber: "EK201",
+            origin: "Dubai",
+            destination: "New York",
+            originCode: "DXB",
+            destinationCode: "JFK",
+            originFlag: "🇦🇪",
+            destinationFlag: "🇺🇸"
+        ),
+        PopularRoute(
+            flightNumber: "BA1",
+            origin: "London",
+            destination: "New York",
+            originCode: "LHR",
+            destinationCode: "JFK",
+            originFlag: "🇬🇧",
+            destinationFlag: "🇺🇸"
+        ),
+        PopularRoute(
+            flightNumber: "UA14",
+            origin: "San Francisco",
+            destination: "London",
+            originCode: "SFO",
+            destinationCode: "LHR",
+            originFlag: "🇺🇸",
+            destinationFlag: "🇬🇧"
+        ),
+        PopularRoute(
+            flightNumber: "LH400",
+            origin: "Frankfurt",
+            destination: "New York",
+            originCode: "FRA",
+            destinationCode: "JFK",
+            originFlag: "🇩🇪",
+            destinationFlag: "🇺🇸"
+        ),
+        PopularRoute(
+            flightNumber: "AF6",
+            origin: "Paris",
+            destination: "New York",
+            originCode: "CDG",
+            destinationCode: "JFK",
+            originFlag: "🇫🇷",
+            destinationFlag: "🇺🇸"
+        ),
+        PopularRoute(
+            flightNumber: "NH9",
+            origin: "Tokyo",
+            destination: "New York",
+            originCode: "HND",
+            destinationCode: "JFK",
+            originFlag: "🇯🇵",
+            destinationFlag: "🇺🇸"
         ),
         PopularRoute(
             flightNumber: "DL1",
@@ -53,76 +119,13 @@ struct PopularRouteStore {
             destinationFlag: "🇬🇧"
         ),
         PopularRoute(
-            flightNumber: "AF693",
-            origin: "Raleigh",
-            destination: "Paris",
-            originCode: "RDU",
-            destinationCode: "CDG",
-            originFlag: "🇺🇸",
-            destinationFlag: "🇫🇷"
-        ),
-        PopularRoute(
-            flightNumber: "UA60",
-            origin: "San Francisco",
-            destination: "Melbourne",
-            originCode: "SFO",
-            destinationCode: "MEL",
-            originFlag: "🇺🇸",
-            destinationFlag: "🇦🇺"
-        ),
-        PopularRoute(
-            flightNumber: "JL46",
-            origin: "Paris",
-            destination: "Tokyo",
-            originCode: "CDG",
-            destinationCode: "HND",
-            originFlag: "🇫🇷",
-            destinationFlag: "🇯🇵"
-        ),
-        PopularRoute(
-            flightNumber: "AA82",
-            origin: "Auckland",
+            flightNumber: "AA2",
+            origin: "New York",
             destination: "Los Angeles",
-            originCode: "AKL",
+            originCode: "JFK",
             destinationCode: "LAX",
-            originFlag: "🇳🇿",
-            destinationFlag: "🇺🇸"
-        ),
-        PopularRoute(
-            flightNumber: "MH387",
-            origin: "Shanghai",
-            destination: "Kuala Lumpur",
-            originCode: "PVG",
-            destinationCode: "KUL",
-            originFlag: "🇨🇳",
-            destinationFlag: "🇲🇾"
-        ),
-        PopularRoute(
-            flightNumber: "BA668",
-            origin: "London",
-            destination: "Marrakesh",
-            originCode: "LHR",
-            destinationCode: "RAK",
-            originFlag: "🇬🇧",
-            destinationFlag: "🇲🇦"
-        ),
-        PopularRoute(
-            flightNumber: "QR921",
-            origin: "Alask",
-            destination: "Doha",
-            originCode: "ALK",
-            destinationCode: "DOH",
             originFlag: "🇺🇸",
-            destinationFlag: "🇶🇦"
-        ),
-        PopularRoute(
-            flightNumber: "QF34",
-            origin: "Paris",
-            destination: "Perth",
-            originCode: "CDG",
-            destinationCode: "PER",
-            originFlag: "🇫🇷",
-            destinationFlag: "🇦🇺"
+            destinationFlag: "🇺🇸"
         )
     ]
 }

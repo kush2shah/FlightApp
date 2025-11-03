@@ -18,30 +18,31 @@ struct RouteView: View {
 
     var body: some View {
         NavigationView {
-            ScrollView {
-                VStack(spacing: 0) {
-                    if viewModel.isLoading {
-                        loadingView
-                    } else if let error = viewModel.error {
-                        errorView(error)
-                    } else {
-                        routeContentView
+            ZStack {
+                // Liquid glass background layer
+                Color.clear
+                    .background(.ultraThinMaterial)
+                    .ignoresSafeArea()
+
+                ScrollView {
+                    VStack(spacing: 0) {
+                        if viewModel.isLoading {
+                            loadingView
+                        } else if let error = viewModel.error {
+                            errorView(error)
+                        } else {
+                            routeContentView
+                        }
                     }
                 }
             }
-            .background(Color(.systemGroupedBackground))
             .navigationTitle("\(origin) → \(destination)")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
-                        dismiss()
-                    }
-                }
-            }
             .sheet(item: $selectedFlight) { identifiableFlightNumber in
                 FlightView(flightNumber: identifiableFlightNumber.value, faFlightId: identifiableFlightNumber.faFlightId, skipFlightSelection: true)
+                    .presentationDetents([.medium, .large])
                     .presentationDragIndicator(.visible)
+                    .presentationBackgroundInteraction(.enabled)
             }
         }
         .task {
@@ -50,29 +51,56 @@ struct RouteView: View {
     }
 
     private var loadingView: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 24) {
+            // Loading Icon - matches error view pattern
+            Circle()
+                .fill(Color.blue.opacity(0.1))
+                .frame(width: 80, height: 80)
+                .overlay(
+                    Image(systemName: "airplane")
+                        .font(.system(size: 32))
+                        .foregroundColor(.blue)
+                        .symbolEffect(.pulse, options: .repeating)
+                )
+
+            VStack(spacing: 8) {
+                Text("Loading Route")
+                    .font(.sfRounded(size: 24, weight: .bold))
+                Text("Fetching route information...")
+                    .font(.sfRounded(size: 15))
+                    .foregroundColor(.secondary)
+            }
+
+            // Progress indicator to show active loading
             ProgressView()
-                .scaleEffect(1.5)
-            Text("Loading route information...")
-                .font(.sfRounded(size: 16))
-                .foregroundColor(.secondary)
+                .tint(.blue)
         }
         .frame(maxWidth: .infinity)
         .padding(.top, 100)
     }
 
     private func errorView(_ error: String) -> some View {
-        VStack(spacing: 16) {
-            Image(systemName: "exclamationmark.triangle")
-                .font(.system(size: 48))
-                .foregroundColor(.orange)
-            Text("Error Loading Route")
-                .font(.sfRounded(size: 20, weight: .semibold))
-            Text(error)
-                .font(.sfRounded(size: 14))
-                .foregroundColor(.secondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal)
+        VStack(spacing: 24) {
+            // Error Icon
+            Circle()
+                .fill(Color.orange.opacity(0.1))
+                .frame(width: 80, height: 80)
+                .overlay(
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 32))
+                        .foregroundColor(.orange)
+                )
+
+            // Error Message
+            VStack(spacing: 8) {
+                Text("Error Loading Route")
+                    .font(.sfRounded(size: 24, weight: .bold))
+                Text(error)
+                    .font(.sfRounded(size: 15))
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
+            }
         }
         .frame(maxWidth: .infinity)
         .padding(.top, 100)
@@ -80,283 +108,296 @@ struct RouteView: View {
 
     private var routeContentView: some View {
         VStack(spacing: 0) {
-            // Route map (hero section)
-            if let primaryRoute = viewModel.primaryRoute {
+            // Route map (hero section) with stats overlay
+            // Show map even without IFR route data - great circle is calculated independently
+            if viewModel.originAirport != nil && viewModel.destinationAirport != nil {
                 RouteMapSection(
                     origin: viewModel.originAirport,
                     destination: viewModel.destinationAirport,
-                    route: primaryRoute
+                    route: viewModel.primaryRoute
                 )
-                .frame(height: 300)
+                .frame(height: 400)
             }
 
-            VStack(spacing: 24) {
-                // Route overview stats
-                if let primaryRoute = viewModel.primaryRoute {
-                    routeOverviewSection(primaryRoute)
-                }
+            // Show content if we have flights, otherwise show empty state
+            if viewModel.currentFlights.isEmpty && viewModel.awards.isEmpty && !viewModel.isLoading {
+                emptyRouteState
+            } else {
+                VStack(spacing: 32) {
+                    // Current flights section (primary focus)
+                    if !viewModel.currentFlights.isEmpty {
+                        currentFlightsSection
+                    }
 
-                // Operator & aircraft stats
-                if viewModel.hasAggregateStats {
-                    aggregateStatsSection
-                }
+                    // Award availability section (only show if we have awards, no "no awards" message)
+                    if !viewModel.awards.isEmpty {
+                        awardAvailabilitySection
+                    }
 
-                // Current flights section
-                if !viewModel.currentFlights.isEmpty {
-                    currentFlightsSection
+                    // Cash prices section (NEW)
+                    cashPricesSection
                 }
-
-                // Award availability section
-                if !viewModel.awards.isEmpty {
-                    awardAvailabilitySection
-                } else if viewModel.shouldShowAwards {
-                    noAwardsView
-                }
+                .padding(.vertical, 32)
             }
-            .padding(.vertical, 24)
         }
     }
 
-    private func routeOverviewSection(_ route: IFRRouteInfo) -> some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Route Details")
-                .font(.sfRounded(size: 20, weight: .bold))
-                .padding(.horizontal)
+    private var emptyRouteState: some View {
+        VStack(spacing: 24) {
+            // Empty State Icon
+            Circle()
+                .fill(Color.blue.opacity(0.1))
+                .frame(width: 80, height: 80)
+                .overlay(
+                    Image(systemName: "airplane.departure")
+                        .font(.system(size: 32))
+                        .foregroundColor(.blue)
+                )
 
-            VStack(spacing: 16) {
-                // Distance and altitude
-                HStack(spacing: 20) {
-                    StatBox(
-                        icon: "arrow.left.and.right",
-                        label: "Distance",
-                        value: route.routeDistance
-                    )
-                    StatBox(
-                        icon: "arrow.up",
-                        label: "Altitude",
-                        value: "FL\(route.filedAltitudeMin/100)-\(route.filedAltitudeMax/100)"
-                    )
-                }
+            // Empty State Message
+            VStack(spacing: 8) {
+                Text("No Flights Found")
+                    .font(.sfRounded(size: 24, weight: .bold))
+                    .foregroundColor(.primary)
 
-                // IFR Route
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        Image(systemName: "map")
-                            .foregroundColor(.blue)
-                        Text("Filed IFR Route")
-                            .font(.sfRounded(size: 14, weight: .semibold))
-                            .foregroundColor(.secondary)
-                    }
-                    Text(route.route)
-                        .font(.system(size: 12, design: .monospaced))
-                        .foregroundColor(.primary)
-                        .lineLimit(3)
-                        .padding()
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(Color(.secondarySystemBackground))
-                        .cornerRadius(8)
-                }
+                Text("There are no scheduled flights on this route today. Try searching for a different date or route.")
+                    .font(.sfRounded(size: 15))
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 40)
             }
-            .padding(.horizontal)
         }
-    }
-
-    private var aggregateStatsSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Common Operators & Aircraft")
-                .font(.sfRounded(size: 20, weight: .bold))
-                .padding(.horizontal)
-
-            VStack(spacing: 12) {
-                if !viewModel.commonAircraft.isEmpty {
-                    InfoCard(
-                        icon: "airplane",
-                        title: "Common Aircraft",
-                        items: viewModel.commonAircraft
-                    )
-                }
-
-                if !viewModel.totalFlightCount.isEmpty {
-                    HStack {
-                        Image(systemName: "chart.bar")
-                            .foregroundColor(.blue)
-                        Text("\(viewModel.totalFlightCount) flights filed on this route")
-                            .font(.sfRounded(size: 14))
-                            .foregroundColor(.secondary)
-                    }
-                    .padding()
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color(.systemBackground))
-                    .cornerRadius(12)
-                    .shadow(color: Color.black.opacity(0.05), radius: 4, x: 0, y: 2)
-                }
-            }
-            .padding(.horizontal)
-        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 80)
     }
 
     private var currentFlightsSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Flights on This Route")
-                .font(.sfRounded(size: 22, weight: .bold))
-                .padding(.horizontal)
+        VStack(alignment: .leading, spacing: 20) {
+            HStack {
+                Text("Explore Flights")
+                    .font(.sfRounded(size: 28, weight: .bold))
+                Spacer()
+                if viewModel.currentFlights.count > 10 {
+                    Text("\(viewModel.currentFlights.count) total")
+                        .font(.sfRounded(size: 14, weight: .medium))
+                        .foregroundColor(.secondary)
+                }
+            }
+            .padding(.horizontal)
 
-            VStack(spacing: 12) {
-                ForEach(viewModel.currentFlights.prefix(10)) { flight in
+            VStack(spacing: 16) {
+                ForEach(sortedFlights.prefix(10)) { flight in
                     Button(action: {
                         selectedFlight = IdentifiableString(value: flight.ident, faFlightId: flight.faFlightId)
                     }) {
                         FlightRowCard(flight: flight)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(PlainButtonStyle())
                 }
             }
             .padding(.horizontal)
+
+            if viewModel.currentFlights.count > 10 {
+                Text("Showing first 10 flights")
+                    .font(.sfRounded(size: 13))
+                    .foregroundColor(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .center)
+            }
+        }
+    }
+
+    // Prioritize in-progress flights, then sort by departure time
+    private var sortedFlights: [AeroFlight] {
+        viewModel.currentFlights.sorted { flight1, flight2 in
+            // Prioritize in-progress flights
+            if flight1.isInProgress && !flight2.isInProgress {
+                return true
+            } else if !flight1.isInProgress && flight2.isInProgress {
+                return false
+            }
+
+            // Then sort by scheduled departure time
+            if let time1 = flight1.scheduledOut, let time2 = flight2.scheduledOut {
+                return time1 < time2
+            }
+
+            return false
         }
     }
 
     private var awardAvailabilitySection: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 20) {
+            // Header
             HStack {
                 Text("Award Availability")
-                    .font(.sfRounded(size: 22, weight: .bold))
+                    .font(.sfRounded(size: 28, weight: .bold))
                 Spacer()
                 Image(systemName: "star.fill")
+                    .font(.system(size: 20))
                     .foregroundColor(.yellow)
             }
             .padding(.horizontal)
 
-            VStack(spacing: 12) {
-                ForEach(viewModel.awards.prefix(20)) { award in
-                    AwardRowCard(award: award)
+            // Filter Bar
+            AwardFilterBar(filters: $viewModel.awardFilters, availablePrograms: viewModel.availablePrograms)
+                .padding(.horizontal)
+
+            // Results count and recommendations
+            if !viewModel.filteredAwards.isEmpty {
+                HStack {
+                    Text("\(viewModel.filteredAwards.count) \(viewModel.filteredAwards.count == 1 ? "award" : "awards") found")
+                        .font(.sfRounded(size: 14, weight: .medium))
+                        .foregroundColor(.secondary)
+
+                    Spacer()
+
+                    if viewModel.awardFilters.hasActiveFilters {
+                        Button(action: {
+                            HapticManager.shared.impact(.light)
+                            viewModel.awardFilters.reset()
+                        }) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "xmark.circle.fill")
+                                    .font(.system(size: 12))
+                                Text("Clear Filters")
+                                    .font(.sfRounded(size: 13, weight: .medium))
+                            }
+                            .foregroundColor(.blue)
+                        }
+                    }
                 }
-            }
-            .padding(.horizontal)
+                .padding(.horizontal)
 
-            if viewModel.awards.count > 20 {
-                Text("Showing top 20 results")
-                    .font(.sfRounded(size: 12))
-                    .foregroundColor(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.top, 8)
-            }
-        }
-    }
+                // Award cards
+                VStack(spacing: 14) {
+                    ForEach(Array(viewModel.filteredAwards.prefix(20).enumerated()), id: \.element.id) { index, award in
+                        AwardRowCard(
+                            award: award,
+                            isRecommended: viewModel.recommendedAwards.contains(where: { $0.id == award.id }),
+                            origin: origin,
+                            destination: destination
+                        )
+                    }
+                }
+                .padding(.horizontal)
 
-    private var noAwardsView: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "star.slash")
-                .font(.system(size: 36))
-                .foregroundColor(.secondary)
-            Text("No award availability found")
-                .font(.sfRounded(size: 16))
-                .foregroundColor(.secondary)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 32)
-    }
-}
+                if viewModel.filteredAwards.count > 20 {
+                    Text("Showing first 20 results")
+                        .font(.sfRounded(size: 13))
+                        .foregroundColor(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                }
+            } else if !viewModel.awards.isEmpty {
+                // No results after filtering
+                VStack(spacing: 24) {
+                    // Empty Filter Icon
+                    Circle()
+                        .fill(Color.blue.opacity(0.1))
+                        .frame(width: 64, height: 64)
+                        .overlay(
+                            Image(systemName: "line.3.horizontal.decrease.circle")
+                                .font(.system(size: 28))
+                                .foregroundColor(.blue)
+                        )
 
-// MARK: - Helper Components
+                    VStack(spacing: 8) {
+                        Text("No awards match your filters")
+                            .font(.sfRounded(size: 18, weight: .semibold))
+                            .foregroundColor(.primary)
 
-struct StatBox: View {
-    let icon: String
-    let label: String
-    let value: String
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 6) {
-                Image(systemName: icon)
-                    .font(.system(size: 14))
-                    .foregroundColor(.blue)
-                Text(label)
-                    .font(.sfRounded(size: 14, weight: .semibold))
-                    .foregroundColor(.secondary)
-            }
-            Text(value)
-                .font(.sfRounded(size: 18, weight: .bold))
-                .foregroundColor(.primary)
-        }
-        .padding()
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(.systemBackground))
-        .cornerRadius(12)
-        .shadow(color: Color.black.opacity(0.05), radius: 4, x: 0, y: 2)
-    }
-}
-
-struct InfoCard: View {
-    let icon: String
-    let title: String
-    let items: [String]
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 6) {
-                Image(systemName: icon)
-                    .foregroundColor(.blue)
-                Text(title)
-                    .font(.sfRounded(size: 14, weight: .semibold))
-                    .foregroundColor(.secondary)
-            }
-            FlowLayout(spacing: 8) {
-                ForEach(items, id: \.self) { item in
-                    Text(item)
-                        .font(.sfRounded(size: 13, weight: .medium))
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(Color.blue.opacity(0.1))
+                        Button("Clear Filters") {
+                            HapticManager.shared.impact(.light)
+                            viewModel.awardFilters.reset()
+                        }
+                        .font(.sfRounded(size: 14, weight: .medium))
                         .foregroundColor(.blue)
-                        .cornerRadius(8)
+                        .padding(.top, 4)
+                    }
                 }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 40)
             }
         }
-        .padding()
-        .background(Color(.systemBackground))
-        .cornerRadius(12)
-        .shadow(color: Color.black.opacity(0.05), radius: 4, x: 0, y: 2)
-    }
-}
-
-// Simple flow layout for tags
-struct FlowLayout: Layout {
-    var spacing: CGFloat = 8
-
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let result = FlowResult(in: proposal.replacingUnspecifiedDimensions().width, subviews: subviews, spacing: spacing)
-        return result.size
     }
 
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        let result = FlowResult(in: bounds.width, subviews: subviews, spacing: spacing)
-        for (index, subview) in subviews.enumerated() {
-            subview.place(at: CGPoint(x: bounds.minX + result.frames[index].minX, y: bounds.minY + result.frames[index].minY), proposal: .unspecified)
-        }
-    }
+    // MARK: - Cash Prices Section
 
-    struct FlowResult {
-        var frames: [CGRect] = []
-        var size: CGSize = .zero
-
-        init(in maxWidth: CGFloat, subviews: Subviews, spacing: CGFloat) {
-            var currentX: CGFloat = 0
-            var currentY: CGFloat = 0
-            var lineHeight: CGFloat = 0
-
-            for subview in subviews {
-                let size = subview.sizeThatFits(.unspecified)
-                if currentX + size.width > maxWidth && currentX > 0 {
-                    currentX = 0
-                    currentY += lineHeight + spacing
-                    lineHeight = 0
+    @ViewBuilder
+    private var cashPricesSection: some View {
+        if FeatureFlags.shared.canUseAmadeus {
+            VStack(alignment: .leading, spacing: 20) {
+                // Header
+                HStack {
+                    Text("Cash Prices")
+                        .font(.sfRounded(size: 28, weight: .bold))
+                    Spacer()
+                    Image(systemName: "dollarsign.circle.fill")
+                        .font(.system(size: 20))
+                        .foregroundColor(.green)
                 }
-                frames.append(CGRect(x: currentX, y: currentY, width: size.width, height: size.height))
-                currentX += size.width + spacing
-                lineHeight = max(lineHeight, size.height)
-            }
+                .padding(.horizontal)
 
-            self.size = CGSize(width: maxWidth, height: currentY + lineHeight)
+                VStack(spacing: 14) {
+                    if viewModel.isLoadingCashPrices {
+                        // Loading state
+                        HStack {
+                            Spacer()
+                            VStack(spacing: 12) {
+                                ProgressView()
+                                Text("Loading cash prices...")
+                                    .font(.sfRounded(size: 13))
+                                    .foregroundColor(.secondary)
+                            }
+                            Spacer()
+                        }
+                        .padding(.vertical, 32)
+                    } else if !viewModel.cashOffers.isEmpty {
+                        // Show cash price cards
+                        ForEach(Array(viewModel.cashOffers.prefix(10).enumerated()), id: \.offset) { index, offer in
+                            CashPriceCard(offer: offer)
+                        }
+                        .padding(.horizontal)
+
+                        if viewModel.cashOffers.count > 10 {
+                            Text("Showing first 10 cash prices")
+                                .font(.sfRounded(size: 13))
+                                .foregroundColor(.secondary)
+                                .frame(maxWidth: .infinity, alignment: .center)
+                        }
+                    } else if viewModel.cashPriceError != nil {
+                        // Error state
+                        VStack(spacing: 12) {
+                            Image(systemName: "exclamationmark.triangle")
+                                .font(.system(size: 48))
+                                .foregroundColor(.orange)
+                            Text("Cash prices unavailable")
+                                .font(.sfRounded(size: 16, weight: .semibold))
+                            Text("Unable to load prices at this time")
+                                .font(.sfRounded(size: 13))
+                                .foregroundColor(.secondary)
+                                .multilineTextAlignment(.center)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 40)
+                    } else if !viewModel.isLoading {
+                        // No results
+                        VStack(spacing: 12) {
+                            Image(systemName: "airplane.departure")
+                                .font(.system(size: 48))
+                                .foregroundColor(.secondary)
+                            Text("No cash prices found")
+                                .font(.sfRounded(size: 16, weight: .semibold))
+                            Text("Try different dates or check back later")
+                                .font(.sfRounded(size: 13))
+                                .foregroundColor(.secondary)
+                                .multilineTextAlignment(.center)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 40)
+                    }
+                }
+            }
         }
     }
 }
@@ -366,10 +407,10 @@ struct FlowLayout: Layout {
 struct RouteMapSection: View {
     let origin: AeroAirport?
     let destination: AeroAirport?
-    let route: IFRRouteInfo
+    let route: IFRRouteInfo?
 
     var body: some View {
-        ZStack {
+        ZStack(alignment: .bottom) {
             if let origin = origin,
                let destination = destination,
                let originCoord = AirportCoordinateService.shared.getCoordinate(for: origin.displayCode),
@@ -380,6 +421,48 @@ struct RouteMapSection: View {
                     destLat: destCoord.coordinate.latitude,
                     destLon: destCoord.coordinate.longitude
                 )
+
+                // Stats overlay with glass effect
+                HStack(spacing: 24) {
+                    // Only show distance if we have route data
+                    if let route = route {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Distance")
+                                .font(.sfRounded(size: 12, weight: .medium))
+                                .foregroundColor(.secondary)
+                            Text(route.routeDistance)
+                                .font(.sfRounded(size: 18, weight: .bold))
+                                .foregroundColor(.primary)
+                        }
+
+                        Divider()
+                            .frame(height: 30)
+                    }
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Route")
+                            .font(.sfRounded(size: 12, weight: .medium))
+                            .foregroundColor(.secondary)
+                        HStack(spacing: 6) {
+                            Text(origin.displayCode)
+                                .font(.sfRounded(size: 18, weight: .bold))
+                            Image(systemName: "arrow.right")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundColor(.blue)
+                            Text(destination.displayCode)
+                                .font(.sfRounded(size: 18, weight: .bold))
+                        }
+                        .foregroundColor(.primary)
+                    }
+
+                    Spacer()
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 16)
+                .glassEffect(.regular, in: .rect(cornerRadius: 16))
+                .shadow(color: Color.black.opacity(0.1), radius: 10, x: 0, y: 4)
+                .padding(.horizontal, 20)
+                .padding(.bottom, 20)
             } else {
                 Color(.systemGray6)
                 VStack {
@@ -412,30 +495,104 @@ struct SimpleRouteMapView: UIViewRepresentable {
         // Clear existing overlays
         mapView.removeOverlays(mapView.overlays)
 
+        // Validate coordinates
+        guard isValidCoordinate(latitude: originLat, longitude: originLon),
+              isValidCoordinate(latitude: destLat, longitude: destLon) else {
+            print("⚠️ Invalid coordinates detected, skipping map update")
+            return
+        }
+
         let origin = CLLocationCoordinate2D(latitude: originLat, longitude: originLon)
         let dest = CLLocationCoordinate2D(latitude: destLat, longitude: destLon)
 
         // Create great circle arc (curved path) between airports
         let arcCoordinates = createGreatCircleArc(from: origin, to: dest, points: 100)
-        let polyline = MKPolyline(coordinates: arcCoordinates, count: arcCoordinates.count)
-        mapView.addOverlay(polyline)
+        
+        // Only add overlay if we got valid coordinates
+        if !arcCoordinates.isEmpty {
+            let polyline = MKPolyline(coordinates: arcCoordinates, count: arcCoordinates.count)
+            mapView.addOverlay(polyline)
+        }
 
-        // Fit to show both airports with some padding
-        let midLat = (originLat + destLat) / 2
-        let midLon = (originLon + destLon) / 2
-        let latDelta = abs(originLat - destLat) * 1.5
-        let lonDelta = abs(originLon - destLon) * 1.5
+        // Calculate safe region that handles transoceanic flights
+        if let region = calculateSafeRegion(from: origin, to: dest) {
+            mapView.setRegion(region, animated: false)
+        } else {
+            // Fallback: show a reasonable default view centered on origin
+            let fallbackRegion = MKCoordinateRegion(
+                center: origin,
+                span: MKCoordinateSpan(latitudeDelta: 10, longitudeDelta: 10)
+            )
+            mapView.setRegion(fallbackRegion, animated: false)
+        }
+    }
 
-        let region = MKCoordinateRegion(
-            center: CLLocationCoordinate2D(latitude: midLat, longitude: midLon),
-            span: MKCoordinateSpan(latitudeDelta: max(latDelta, 5), longitudeDelta: max(lonDelta, 5))
+    // Create great circle arc between two points
+
+    // Validate that coordinates are within valid ranges
+    private func isValidCoordinate(latitude: Double, longitude: Double) -> Bool {
+        return latitude >= -90 && latitude <= 90 &&
+               longitude >= -180 && longitude <= 180 &&
+               !latitude.isNaN && !longitude.isNaN &&
+               !latitude.isInfinite && !longitude.isInfinite
+    }
+    
+    // Calculate a safe region that handles edge cases like transoceanic flights
+    private func calculateSafeRegion(from origin: CLLocationCoordinate2D, to dest: CLLocationCoordinate2D) -> MKCoordinateRegion? {
+        // Calculate the center point
+        let centerLat = (origin.latitude + dest.latitude) / 2
+        var centerLon = (origin.longitude + dest.longitude) / 2
+        
+        // Handle date line crossing for longitude
+        let lonDiff = abs(origin.longitude - dest.longitude)
+        if lonDiff > 180 {
+            // Flight crosses the date line
+            let adjustedOriginLon = origin.longitude < 0 ? origin.longitude + 360 : origin.longitude
+            let adjustedDestLon = dest.longitude < 0 ? dest.longitude + 360 : dest.longitude
+            centerLon = (adjustedOriginLon + adjustedDestLon) / 2
+            if centerLon > 180 {
+                centerLon -= 360
+            }
+        }
+        
+        // Calculate span with safety limits
+        let latDelta = abs(origin.latitude - dest.latitude)
+        let lonDelta = min(lonDiff, 360 - lonDiff) // Handle wrap-around
+        
+        // Add padding but cap at reasonable maximums
+        // For transoceanic flights, we want to show the route but not too much ocean
+        let paddingMultiplier: Double = 1.4
+        let safeLatDelta = min(latDelta * paddingMultiplier + 10, 160) // Max ~160° (leave poles visible)
+        let safeLonDelta = min(lonDelta * paddingMultiplier + 20, 340) // Max ~340° (almost full wrap)
+        
+        // Ensure minimum span for very close airports
+        let finalLatDelta = max(safeLatDelta, 5)
+        let finalLonDelta = max(safeLonDelta, 5)
+        
+        // Validate the final region
+        guard isValidCoordinate(latitude: centerLat, longitude: centerLon),
+              finalLatDelta > 0 && finalLatDelta <= 180,
+              finalLonDelta > 0 && finalLonDelta <= 360 else {
+            print("⚠️ Calculated region is invalid")
+            return nil
+        }
+        
+        return MKCoordinateRegion(
+            center: CLLocationCoordinate2D(latitude: centerLat, longitude: centerLon),
+            span: MKCoordinateSpan(latitudeDelta: finalLatDelta, longitudeDelta: finalLonDelta)
         )
-        mapView.setRegion(region, animated: false)
     }
 
     // Create great circle arc between two points
     private func createGreatCircleArc(from start: CLLocationCoordinate2D, to end: CLLocationCoordinate2D, points: Int) -> [CLLocationCoordinate2D] {
         var coordinates: [CLLocationCoordinate2D] = []
+
+        // Validate input coordinates
+        guard isValidCoordinate(latitude: start.latitude, longitude: start.longitude),
+              isValidCoordinate(latitude: end.latitude, longitude: end.longitude) else {
+            print("⚠️ Invalid coordinates for great circle arc")
+            return []
+        }
 
         // Convert to radians
         let lat1 = start.latitude * .pi / 180
@@ -444,14 +601,32 @@ struct SimpleRouteMapView: UIViewRepresentable {
         let lon2 = end.longitude * .pi / 180
 
         // Calculate great circle distance
-        let d = 2 * asin(sqrt(pow(sin((lat1 - lat2) / 2), 2) + cos(lat1) * cos(lat2) * pow(sin((lon1 - lon2) / 2), 2)))
+        let dLat = lat2 - lat1
+        let dLon = lon2 - lon1
+        let a = sin(dLat / 2) * sin(dLat / 2) + cos(lat1) * cos(lat2) * sin(dLon / 2) * sin(dLon / 2)
+        let d = 2 * atan2(sqrt(a), sqrt(1 - a))
+
+        // Check for degenerate cases
+        if d.isNaN || d.isInfinite || d < 0.0001 {
+            // Points are too close or calculation failed, return straight line
+            print("⚠️ Degenerate case in great circle calculation, using straight line")
+            return [start, end]
+        }
+
+        let sinD = sin(d)
+        
+        // Another safety check for division by zero
+        if abs(sinD) < 0.0001 {
+            print("⚠️ sin(d) too close to zero, using straight line")
+            return [start, end]
+        }
 
         // Generate points along the arc
         for i in 0...points {
             let fraction = Double(i) / Double(points)
 
-            let a = sin((1 - fraction) * d) / sin(d)
-            let b = sin(fraction * d) / sin(d)
+            let a = sin((1 - fraction) * d) / sinD
+            let b = sin(fraction * d) / sinD
 
             let x = a * cos(lat1) * cos(lon1) + b * cos(lat2) * cos(lon2)
             let y = a * cos(lat1) * sin(lon1) + b * cos(lat2) * sin(lon2)
@@ -460,10 +635,24 @@ struct SimpleRouteMapView: UIViewRepresentable {
             let lat = atan2(z, sqrt(x * x + y * y))
             let lon = atan2(y, x)
 
-            coordinates.append(CLLocationCoordinate2D(
-                latitude: lat * 180 / .pi,
-                longitude: lon * 180 / .pi
-            ))
+            let latDeg = lat * 180 / .pi
+            let lonDeg = lon * 180 / .pi
+
+            // Validate each calculated point
+            if isValidCoordinate(latitude: latDeg, longitude: lonDeg) {
+                coordinates.append(CLLocationCoordinate2D(
+                    latitude: latDeg,
+                    longitude: lonDeg
+                ))
+            } else {
+                print("⚠️ Invalid coordinate generated at point \(i), skipping")
+            }
+        }
+
+        // If we didn't get enough valid points, fall back to simple line
+        if coordinates.count < 2 {
+            print("⚠️ Not enough valid points in arc, using straight line")
+            return [start, end]
         }
 
         return coordinates
@@ -491,43 +680,103 @@ struct SimpleRouteMapView: UIViewRepresentable {
 struct FlightRowCard: View {
     let flight: AeroFlight
 
+    private var airlineCode: String? {
+        flight.operatorIata ?? flight.operatorIcao
+    }
+
     var body: some View {
-        HStack(spacing: 16) {
-            // Flight number and aircraft
-            VStack(alignment: .leading, spacing: 4) {
-                Text(flight.ident)
-                    .font(.sfRounded(size: 16, weight: .bold))
-                    .foregroundColor(.blue)
-                if let aircraftName = AircraftTypeService.shared.getAircraftName(from: flight.aircraftType) {
-                    Text(aircraftName)
+        VStack(spacing: 12) {
+            HStack(spacing: 16) {
+                // Airline logo
+                if let code = airlineCode {
+                    AirlineLogoView(iataCode: code, size: 48)
+                } else {
+                    Image(systemName: "airplane.circle.fill")
+                        .font(.system(size: 48))
+                        .foregroundColor(.blue)
+                }
+
+                // Flight info
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(flight.ident)
+                        .font(.sfRounded(size: 18, weight: .bold))
+                        .foregroundColor(.primary)
+
+                    if let aircraftName = AircraftTypeService.shared.getAircraftName(from: flight.aircraftType) {
+                        Text(aircraftName)
+                            .font(.sfRounded(size: 13))
+                            .foregroundColor(.secondary)
+                    }
+
+                    // Status badge
+                    HStack(spacing: 6) {
+                        Circle()
+                            .fill(statusColor)
+                            .frame(width: 6, height: 6)
+                        Text(statusText)
+                            .font(.sfRounded(size: 12, weight: .medium))
+                            .foregroundColor(statusColor)
+                    }
+                }
+
+                Spacer()
+
+                // Time info
+                VStack(alignment: .trailing, spacing: 4) {
+                    if let scheduledOut = flight.scheduledOut {
+                        Text(formatTime(scheduledOut))
+                            .font(.sfRounded(size: 15, weight: .semibold))
+                            .foregroundColor(.primary)
+                    }
+                    Text("Departure")
                         .font(.sfRounded(size: 12))
                         .foregroundColor(.secondary)
                 }
             }
 
-            Spacer()
-
-            // Time info
-            VStack(alignment: .trailing, spacing: 4) {
-                if let scheduledOut = flight.scheduledOut {
-                    Text(formatTime(scheduledOut))
-                        .font(.sfRounded(size: 14, weight: .medium))
-                }
-                if flight.isInProgress {
-                    Text("In Flight")
-                        .font(.sfRounded(size: 12, weight: .semibold))
-                        .foregroundColor(.green)
-                } else {
-                    Text("Scheduled")
-                        .font(.sfRounded(size: 12))
+            // Date info at bottom
+            if let scheduledOut = flight.scheduledOut {
+                Divider()
+                HStack {
+                    Image(systemName: "calendar")
+                        .font(.system(size: 12))
                         .foregroundColor(.secondary)
+                    Text(formatDate(scheduledOut))
+                        .font(.sfRounded(size: 13, weight: .medium))
+                        .foregroundColor(.secondary)
+                    Spacer()
                 }
             }
         }
-        .padding()
-        .background(Color(.systemBackground))
-        .cornerRadius(12)
-        .shadow(color: Color.black.opacity(0.05), radius: 4, x: 0, y: 2)
+        .padding(18)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(.clear)
+                .glassEffect(.regular, in: .rect(cornerRadius: 16))
+                .shadow(color: Color.black.opacity(0.06), radius: 6, x: 0, y: 3)
+        )
+    }
+
+    private var statusColor: Color {
+        if flight.isInProgress {
+            return .green
+        } else if flight.status.lowercased().contains("cancelled") {
+            return .red
+        } else if flight.status.lowercased().contains("delayed") {
+            return .orange
+        }
+        return .blue
+    }
+
+    private var statusText: String {
+        if flight.isInProgress {
+            return "In Flight"
+        } else if flight.status.lowercased().contains("cancelled") {
+            return "Cancelled"
+        } else if flight.status.lowercased().contains("delayed") {
+            return "Delayed"
+        }
+        return "Scheduled"
     }
 
     private func formatTime(_ isoString: String) -> String {
@@ -535,8 +784,201 @@ struct FlightRowCard: View {
         guard let date = formatter.date(from: isoString) else { return isoString }
 
         let timeFormatter = DateFormatter()
-        timeFormatter.dateFormat = "MMM d, h:mm a"
+        timeFormatter.dateFormat = "h:mm a"
         return timeFormatter.string(from: date)
+    }
+
+    private func formatDate(_ isoString: String) -> String {
+        let formatter = ISO8601DateFormatter()
+        guard let date = formatter.date(from: isoString) else { return isoString }
+
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "EEE, MMM d, yyyy"
+        return dateFormatter.string(from: date)
+    }
+}
+
+// MARK: - Award Filter Bar
+
+struct AwardFilterBar: View {
+    @Binding var filters: AwardFilters
+    let availablePrograms: [String]
+
+    @State private var showDatePicker = false
+    @State private var showProgramsMenu = false
+
+    var body: some View {
+        VStack(spacing: 12) {
+            // Cabin class chips
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 10) {
+                    ForEach(CabinClass.allCases, id: \.self) { cabin in
+                        CabinChip(
+                            cabin: cabin,
+                            isSelected: filters.selectedCabins.contains(cabin),
+                            onTap: {
+                                HapticManager.shared.impact(.soft)
+                                if filters.selectedCabins.contains(cabin) {
+                                    filters.selectedCabins.remove(cabin)
+                                } else {
+                                    filters.selectedCabins.insert(cabin)
+                                }
+                            }
+                        )
+                    }
+
+                    Divider()
+                        .frame(height: 24)
+
+                    // Date range button
+                    Button(action: {
+                        HapticManager.shared.impact(.soft)
+                        showDatePicker.toggle()
+                    }) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "calendar")
+                                .font(.system(size: 12, weight: .medium))
+                            Text("\(filters.dateRange.daysCount) days")
+                                .font(.sfRounded(size: 13, weight: .medium))
+                        }
+                        .foregroundColor(filters.dateRange == .next30Days ? .secondary : .blue)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .glassEffect(.regular, in: .rect(cornerRadius: 16))
+                    }
+
+                    // Mileage programs filter
+                    if !availablePrograms.isEmpty {
+                        Menu {
+                            ForEach(availablePrograms, id: \.self) { program in
+                                Button(action: {
+                                    HapticManager.shared.impact(.soft)
+                                    if filters.selectedPrograms.contains(program) {
+                                        filters.selectedPrograms.remove(program)
+                                    } else {
+                                        filters.selectedPrograms.insert(program)
+                                    }
+                                }) {
+                                    HStack {
+                                        Text(program)
+                                        if filters.selectedPrograms.contains(program) {
+                                            Image(systemName: "checkmark")
+                                        }
+                                    }
+                                }
+                            }
+                            if !filters.selectedPrograms.isEmpty {
+                                Divider()
+                                Button("Clear Program Filter", action: {
+                                    HapticManager.shared.impact(.light)
+                                    filters.selectedPrograms.removeAll()
+                                })
+                            }
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: "building.2")
+                                    .font(.system(size: 12, weight: .medium))
+                                if filters.selectedPrograms.isEmpty {
+                                    Text("All Programs")
+                                        .font(.sfRounded(size: 13, weight: .medium))
+                                } else {
+                                    Text("\(filters.selectedPrograms.count) selected")
+                                        .font(.sfRounded(size: 13, weight: .medium))
+                                }
+                            }
+                            .foregroundColor(filters.selectedPrograms.isEmpty ? .secondary : .blue)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 8)
+                            .glassEffect(.regular, in: .rect(cornerRadius: 16))
+                        }
+                    }
+                }
+                .padding(.horizontal, 2)
+            }
+
+            // Date range picker (shown when expanded)
+            if showDatePicker {
+                VStack(spacing: 12) {
+                    Text("Search Date Range")
+                        .font(.sfRounded(size: 14, weight: .semibold))
+                        .foregroundColor(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                    VStack(spacing: 8) {
+                        DateRangeButton(title: "Next 7 Days", range: .next7Days, currentRange: $filters.dateRange)
+                        DateRangeButton(title: "Next 30 Days", range: .next30Days, currentRange: $filters.dateRange)
+                        DateRangeButton(title: "Next 60 Days", range: .next60Days, currentRange: $filters.dateRange)
+                        DateRangeButton(title: "Next 90 Days", range: .next90Days, currentRange: $filters.dateRange)
+                    }
+                }
+                .padding()
+                .glassEffect(.regular, in: .rect(cornerRadius: 16))
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+    }
+}
+
+struct CabinChip: View {
+    let cabin: CabinClass
+    let isSelected: Bool
+    let onTap: () -> Void
+
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: 6) {
+                Image(systemName: cabin.icon)
+                    .font(.system(size: 12, weight: .medium))
+                Text(cabin.displayName)
+                    .font(.sfRounded(size: 13, weight: .medium))
+            }
+            .foregroundColor(isSelected ? .white : .secondary)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            .background(
+                Group {
+                    if isSelected {
+                        Color.blue
+                    } else {
+                        Color.clear
+                            .glassEffect(.regular, in: .rect(cornerRadius: 16))
+                    }
+                }
+            )
+            .cornerRadius(16)
+        }
+    }
+}
+
+struct DateRangeButton: View {
+    let title: String
+    let range: DateRange
+    @Binding var currentRange: DateRange
+
+    var isSelected: Bool {
+        currentRange == range
+    }
+
+    var body: some View {
+        Button(action: {
+            HapticManager.shared.impact(.soft)
+            currentRange = range
+        }) {
+            HStack {
+                Text(title)
+                    .font(.sfRounded(size: 14, weight: .medium))
+                Spacer()
+                if isSelected {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 12, weight: .semibold))
+                }
+            }
+            .foregroundColor(isSelected ? .blue : .primary)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(isSelected ? Color.blue.opacity(0.1) : Color.clear)
+            .cornerRadius(10)
+        }
     }
 }
 
@@ -544,43 +986,139 @@ struct FlightRowCard: View {
 
 struct AwardRowCard: View {
     let award: AwardAvailability
+    let isRecommended: Bool
+    let origin: String
+    let destination: String
+
+    @State private var showAllCabins = false
 
     var body: some View {
-        HStack(spacing: 16) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(formatDate(award.date))
-                    .font(.sfRounded(size: 14, weight: .semibold))
-                Text(formatProgram(award.source))
-                    .font(.sfRounded(size: 12))
-                    .foregroundColor(.secondary)
+        let bookingURL = award.generateBookingURL(origin: origin, destination: destination)
+
+        Button(action: {
+            HapticManager.shared.impact(.light)
+            if let bookingURL = bookingURL {
+                UIApplication.shared.open(bookingURL)
             }
+        }) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 16) {
+                    // Date icon and info
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "calendar")
+                                .font(.system(size: 16))
+                                .foregroundColor(.blue)
+                            Text(formatDate(award.date))
+                                .font(.sfRounded(size: 16, weight: .semibold))
+                                .foregroundColor(.primary)
 
-            Spacer()
-
-            if let cabin = award.bestAvailableCabin() {
-                VStack(alignment: .trailing, spacing: 4) {
-                    HStack(spacing: 4) {
-                        Text(cabin.cost)
-                            .font(.sfRounded(size: 16, weight: .bold))
-                            .foregroundColor(.blue)
-                        Text("pts")
-                            .font(.sfRounded(size: 12))
+                            if isRecommended {
+                                Text("Best Value")
+                                    .font(.sfRounded(size: 11, weight: .bold))
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(Color.green)
+                                    .cornerRadius(6)
+                            }
+                        }
+                        Text(formatProgram(award.source))
+                            .font(.sfRounded(size: 13))
                             .foregroundColor(.secondary)
                     }
-                    HStack(spacing: 4) {
-                        Text(cabin.cabin)
-                            .font(.sfRounded(size: 12, weight: .medium))
-                        Text("(\(cabin.seats) left)")
-                            .font(.sfRounded(size: 11))
+
+                    Spacer()
+
+                    // Book button - only show if we have a valid booking URL
+                    if bookingURL != nil {
+                        BookButton {
+                            // Action is already handled by the outer Button
+                        }
+                    }
+                }
+
+                // Best available cabin (always shown)
+                if let cabin = award.bestAvailableCabin() {
+                    HStack {
+                        HStack(spacing: 4) {
+                            Text(cabin.cost)
+                                .font(.sfRounded(size: 18, weight: .bold))
+                                .foregroundColor(.blue)
+                            Text("pts")
+                                .font(.sfRounded(size: 13, weight: .medium))
+                                .foregroundColor(.secondary)
+                        }
+
+                        Spacer()
+
+                        HStack(spacing: 6) {
+                            Text(cabin.cabin)
+                                .font(.sfRounded(size: 13, weight: .medium))
+                                .foregroundColor(.primary)
+                            Text("• \(cabin.seats) left")
+                                .font(.sfRounded(size: 12))
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
+
+                // Show all available cabins if expanded
+                if showAllCabins {
+                    Divider()
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("All Available Cabins")
+                            .font(.sfRounded(size: 12, weight: .semibold))
                             .foregroundColor(.secondary)
+
+                        ForEach(award.allAvailableCabins(), id: \.cabin) { cabin in
+                            HStack {
+                                Image(systemName: cabin.cabin.icon)
+                                    .font(.system(size: 12))
+                                    .foregroundColor(.blue)
+                                    .frame(width: 20)
+
+                                Text(cabin.cabin.displayName)
+                                    .font(.sfRounded(size: 13, weight: .medium))
+
+                                Spacer()
+
+                                Text("\(cabin.cost) pts")
+                                    .font(.sfRounded(size: 13, weight: .semibold))
+                                    .foregroundColor(.blue)
+
+                                Text("• \(cabin.seats) left")
+                                    .font(.sfRounded(size: 12))
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                    }
+                }
+
+                // Toggle button for all cabins (only show if multiple cabins available)
+                if award.allAvailableCabins().count > 1 {
+                    Button(action: {
+                        HapticManager.shared.impact(.soft)
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            showAllCabins.toggle()
+                        }
+                    }) {
+                        HStack {
+                            Text(showAllCabins ? "Show Less" : "Show All Cabins (\(award.allAvailableCabins().count))")
+                                .font(.sfRounded(size: 12, weight: .medium))
+                                .foregroundColor(.blue)
+                            Image(systemName: showAllCabins ? "chevron.up" : "chevron.down")
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundColor(.blue)
+                        }
                     }
                 }
             }
+            .padding(16)
+            .glassEffect(.regular, in: .rect(cornerRadius: 14))
+            .shadow(color: Color.black.opacity(0.06), radius: 6, x: 0, y: 3)
         }
-        .padding()
-        .background(Color(.systemBackground))
-        .cornerRadius(12)
-        .shadow(color: Color.black.opacity(0.05), radius: 4, x: 0, y: 2)
+        .buttonStyle(PlainButtonStyle())
     }
 
     private func formatDate(_ dateString: String) -> String {

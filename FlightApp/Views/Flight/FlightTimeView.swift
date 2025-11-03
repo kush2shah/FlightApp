@@ -77,16 +77,31 @@ struct FlightTimeView: View {
     private var statusBadge: some View {
         Group {
             if let difference = time.minutesDifference {
+                let formattedTime = formatMinutes(difference)
                 HStack(spacing: 4) {
                     Image(systemName: time.isEarly ? "arrow.down.circle.fill" : "arrow.up.circle.fill")
                         .foregroundColor(time.isEarly ? .green : .red)
-                    
-                    Text("\(difference)m \(time.isEarly ? "Early" : "Delayed")")
+
+                    Text("\(formattedTime) \(time.isEarly ? "Early" : "Delayed")")
                         .font(.caption)
                         .foregroundColor(time.isEarly ? .green : .red)
                 }
             }
         }
+    }
+
+    // Helper to format minutes into hours and minutes
+    private func formatMinutes(_ minutes: Int) -> String {
+        let hours = minutes / 60
+        let remainingMinutes = minutes % 60
+
+        if hours > 0 {
+            if remainingMinutes > 0 {
+                return "\(hours)h \(remainingMinutes)m"
+            }
+            return "\(hours)h"
+        }
+        return "\(minutes)m"
     }
     
     // Dynamic color based on time status

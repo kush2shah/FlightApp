@@ -7,45 +7,141 @@
 
 import SwiftUI
 
-struct SettingsView: View {
+/// Settings button that displays a context menu with Liquid Glass effects
+struct SettingsButton: View {
     @StateObject private var featureFlags = FeatureFlags.shared
-    @Environment(\.dismiss) private var dismiss
+    @StateObject private var awardPreferences = AwardPreferences.shared
+    @AppStorage("hapticIntensity") private var hapticIntensity: HapticIntensity = .aggressive
+    @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
 
     var body: some View {
-        NavigationView {
-            Form {
-                Section {
-                    Toggle("Award Search", isOn: $featureFlags.isSeatsAeroEnabled)
-                } header: {
-                    Text("Features")
-                } footer: {
-                    Text("Enable award availability search powered by Seats.aero. Disable this if the service becomes unavailable or you prefer flight tracking only.")
+        Menu {
+            // Haptic Intensity Picker
+            Menu {
+                ForEach(HapticIntensity.allCases) { intensity in
+                    Button {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                            hapticIntensity = intensity
+                            HapticManager.shared.impact(.medium, intensity: intensity.multiplier)
+                        }
+                    } label: {
+                        HStack {
+                            Text(intensity.displayName)
+                            if hapticIntensity == intensity {
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                    }
+                }
+            } label: {
+                Label("Haptic: \(hapticIntensity.displayName)", systemImage: "waveform")
+            }
+
+            // Award Search Settings
+            Section("Award Search") {
+                Toggle(isOn: $featureFlags.isSeatsAeroEnabled) {
+                    Label("Enable Award Search", systemImage: "star.fill")
                 }
 
-                Section {
-                    HStack {
-                        Text("Version")
-                        Spacer()
-                        Text("0.0")
-                            .foregroundColor(.secondary)
+                if featureFlags.isSeatsAeroEnabled {
+                    // Default search date range
+                    Menu {
+                        ForEach([7, 30, 60, 90], id: \.self) { days in
+                            Button {
+                                HapticManager.shared.impact(.soft)
+                                awardPreferences.defaultDateRangeDays = days
+                            } label: {
+                                HStack {
+                                    Text("\(days) days")
+                                    if awardPreferences.defaultDateRangeDays == days {
+                                        Image(systemName: "checkmark")
+                                    }
+                                }
+                            }
+                        }
+                    } label: {
+                        Label("Default Range: \(awardPreferences.defaultDateRangeDays) days", systemImage: "calendar")
                     }
-                } header: {
-                    Text("About")
+
+                    // Default cabin classes
+                    Menu {
+                        Button {
+                            HapticManager.shared.impact(.soft)
+                            awardPreferences.defaultCabins = Set(CabinClass.allCases)
+                        } label: {
+                            HStack {
+                                Text("All Cabins")
+                                if awardPreferences.defaultCabins.count == CabinClass.allCases.count {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+
+                        Button {
+                            HapticManager.shared.impact(.soft)
+                            awardPreferences.defaultCabins = [.business, .first]
+                        } label: {
+                            HStack {
+                                Text("Premium Only")
+                                if awardPreferences.defaultCabins == [.business, .first] {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+
+                        Button {
+                            HapticManager.shared.impact(.soft)
+                            awardPreferences.defaultCabins = [.economy, .premiumEconomy]
+                        } label: {
+                            HStack {
+                                Text("Economy Only")
+                                if awardPreferences.defaultCabins == [.economy, .premiumEconomy] {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+                    } label: {
+                        Label("Default Cabins", systemImage: "airplane.circle")
+                    }
+
+                    Toggle(isOn: $awardPreferences.showAllCabinsInResults) {
+                        Label("Show All Cabins in Results", systemImage: "list.bullet")
+                    }
                 }
             }
-            .navigationTitle("Settings")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
-                        dismiss()
-                    }
+
+            // App Section
+            Section {
+                Button {
+                    HapticManager.shared.impact(.medium)
+                    hasCompletedOnboarding = false
+                } label: {
+                    Label("Reset Onboarding", systemImage: "arrow.counterclockwise")
                 }
+
+                Label("Version 0.1", systemImage: "info.circle")
             }
+        } label: {
+            // Simple button without any glass effects
+            Image(systemName: "gearshape.fill")
+                .font(.system(size: 20))
+                .foregroundColor(.primary)
         }
     }
 }
 
 #Preview {
-    SettingsView()
+    NavigationStack {
+        VStack {
+            Spacer()
+            Text("Flight Tracker")
+                .font(.largeTitle)
+            Spacer()
+        }
+        .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                SettingsButton()
+            }
+        }
+    }
 }
