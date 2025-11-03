@@ -24,16 +24,31 @@ struct FlightTime {
     // Computed property for time status description
     var statusDescription: String? {
         guard !cancelled else { return "Cancelled" }
-        
+
         if let minutesDifference = minutesDifference {
+            let formattedTime = formatMinutes(minutesDifference)
             if isEarly {
-                return "\(minutesDifference)m Early"
+                return "\(formattedTime) Early"
             } else if isDelayed {
-                return "\(minutesDifference)m Delayed"
+                return "\(formattedTime) Delayed"
             }
         }
-        
+
         return nil
+    }
+
+    // Helper to format minutes into hours and minutes
+    private func formatMinutes(_ minutes: Int) -> String {
+        let hours = minutes / 60
+        let remainingMinutes = minutes % 60
+
+        if hours > 0 {
+            if remainingMinutes > 0 {
+                return "\(hours)h \(remainingMinutes)m"
+            }
+            return "\(hours)h"
+        }
+        return "\(minutes)m"
     }
     
     var smartDateDisplay: String {

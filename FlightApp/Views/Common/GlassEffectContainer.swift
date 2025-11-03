@@ -7,23 +7,6 @@
 
 import SwiftUI
 
-/// A container that groups liquid glass effect elements with proper spacing
-struct GlassEffectContainer<Content: View>: View {
-    let spacing: CGFloat
-    let content: Content
-
-    init(spacing: CGFloat = 16, @ViewBuilder content: () -> Content) {
-        self.spacing = spacing
-        self.content = content()
-    }
-
-    var body: some View {
-        VStack(spacing: spacing) {
-            content
-        }
-    }
-}
-
 /// Constants for glass effects
 struct GlassConstants {
     static let defaultCornerRadius: CGFloat = 20

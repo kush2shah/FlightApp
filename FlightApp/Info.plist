@@ -8,6 +8,14 @@
 	<string>$(AERO_API_KEY)</string>
 	<key>SEATS_AERO_API_KEY</key>
 	<string>$(SEATS_AERO_API_KEY)</string>
+	<key>AMADEUS_TEST_KEY</key>
+	<string>$(AMADEUS_TEST_KEY)</string>
+	<key>AMADEUS_TEST_SECRET</key>
+	<string>$(AMADEUS_TEST_SECRET)</string>
+	<key>AMADEUS_PROD_KEY</key>
+	<string>$(AMADEUS_PROD_KEY)</string>
+	<key>AMADEUS_PROD_SECRET</key>
+	<string>$(AMADEUS_PROD_SECRET)</string>
 	<key>UIBackgroundModes</key>
 	<array/>
 </dict>

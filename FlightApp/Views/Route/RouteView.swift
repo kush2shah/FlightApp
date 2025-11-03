@@ -133,6 +133,9 @@ struct RouteView: View {
                     if !viewModel.awards.isEmpty {
                         awardAvailabilitySection
                     }
+
+                    // Cash prices section (NEW)
+                    cashPricesSection
                 }
                 .padding(.vertical, 32)
             }
@@ -318,6 +321,85 @@ struct RouteView: View {
         }
     }
 
+    // MARK: - Cash Prices Section
+
+    @ViewBuilder
+    private var cashPricesSection: some View {
+        if FeatureFlags.shared.canUseAmadeus {
+            VStack(alignment: .leading, spacing: 20) {
+                // Header
+                HStack {
+                    Text("Cash Prices")
+                        .font(.sfRounded(size: 28, weight: .bold))
+                    Spacer()
+                    Image(systemName: "dollarsign.circle.fill")
+                        .font(.system(size: 20))
+                        .foregroundColor(.green)
+                }
+                .padding(.horizontal)
+
+                VStack(spacing: 14) {
+                    if viewModel.isLoadingCashPrices {
+                        // Loading state
+                        HStack {
+                            Spacer()
+                            VStack(spacing: 12) {
+                                ProgressView()
+                                Text("Loading cash prices...")
+                                    .font(.sfRounded(size: 13))
+                                    .foregroundColor(.secondary)
+                            }
+                            Spacer()
+                        }
+                        .padding(.vertical, 32)
+                    } else if !viewModel.cashOffers.isEmpty {
+                        // Show cash price cards
+                        ForEach(Array(viewModel.cashOffers.prefix(10).enumerated()), id: \.offset) { index, offer in
+                            CashPriceCard(offer: offer)
+                        }
+                        .padding(.horizontal)
+
+                        if viewModel.cashOffers.count > 10 {
+                            Text("Showing first 10 cash prices")
+                                .font(.sfRounded(size: 13))
+                                .foregroundColor(.secondary)
+                                .frame(maxWidth: .infinity, alignment: .center)
+                        }
+                    } else if viewModel.cashPriceError != nil {
+                        // Error state
+                        VStack(spacing: 12) {
+                            Image(systemName: "exclamationmark.triangle")
+                                .font(.system(size: 48))
+                                .foregroundColor(.orange)
+                            Text("Cash prices unavailable")
+                                .font(.sfRounded(size: 16, weight: .semibold))
+                            Text("Unable to load prices at this time")
+                                .font(.sfRounded(size: 13))
+                                .foregroundColor(.secondary)
+                                .multilineTextAlignment(.center)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 40)
+                    } else if !viewModel.isLoading {
+                        // No results
+                        VStack(spacing: 12) {
+                            Image(systemName: "airplane.departure")
+                                .font(.system(size: 48))
+                                .foregroundColor(.secondary)
+                            Text("No cash prices found")
+                                .font(.sfRounded(size: 16, weight: .semibold))
+                            Text("Try different dates or check back later")
+                                .font(.sfRounded(size: 13))
+                                .foregroundColor(.secondary)
+                                .multilineTextAlignment(.center)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 40)
+                    }
+                }
+            }
+        }
+    }
 }
 
 // MARK: - Route Map Section
@@ -950,13 +1032,9 @@ struct AwardRowCard: View {
 
                     // Book button - only show if we have a valid booking URL
                     if bookingURL != nil {
-                        HStack(spacing: 6) {
-                            Text("Book")
-                                .font(.sfRounded(size: 14, weight: .semibold))
-                            Image(systemName: "arrow.up.right")
-                                .font(.system(size: 12, weight: .semibold))
+                        BookButton {
+                            // Action is already handled by the outer Button
                         }
-                        .foregroundColor(.blue)
                     }
                 }
 

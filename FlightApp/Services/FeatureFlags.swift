@@ -13,10 +13,17 @@ class FeatureFlags: ObservableObject {
     static let shared = FeatureFlags()
 
     @AppStorage("seatsAeroEnabled") var isSeatsAeroEnabled: Bool = true
+    @AppStorage("amadeusEnabled") var isAmadeusEnabled: Bool = true
+    @AppStorage("amadeusProduction") var isAmadeusProduction: Bool = false
 
     /// Check if Seats.aero API integration is enabled
     var canUseSeatsAero: Bool {
         isSeatsAeroEnabled
+    }
+
+    /// Check if Amadeus API integration is enabled
+    var canUseAmadeus: Bool {
+        isAmadeusEnabled
     }
 
     private init() {}

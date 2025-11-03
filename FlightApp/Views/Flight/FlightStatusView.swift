@@ -7,12 +7,6 @@
 
 import SwiftUI
 
-extension Font {
-    static func sfRounded(size: CGFloat, weight: Font.Weight = .regular) -> Font {
-        return .system(size: size, weight: weight, design: .rounded)
-    }
-}
-
 struct FlightStatusView: View {
     let flight: AeroFlight
     

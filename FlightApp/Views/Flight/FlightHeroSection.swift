@@ -14,46 +14,47 @@ struct FlightHeroSection: View {
         if flight.cancelled {
             return ("Cancelled", .red, "xmark.circle.fill", false)
         }
-        
+
         // Arrived status
         if flight.actualOn != nil {
             if let arrivalDelay = flight.arrivalDelay {
                 if arrivalDelay > 900 { // 15+ minutes late
-                    let minutes = arrivalDelay / 60
-                    return ("Arrived \(minutes)m Late", .orange, "checkmark.circle.fill", false)
+                    let formattedTime = arrivalDelay.formattedDelay()
+                    return ("Arrived \(formattedTime) Late", .orange, "checkmark.circle.fill", false)
                 } else if arrivalDelay < -300 { // 5+ minutes early
-                    let minutes = abs(arrivalDelay) / 60
-                    return ("Arrived \(minutes)m Early", .green, "checkmark.circle.fill", false)
+                    let formattedTime = abs(arrivalDelay).formattedDelay()
+                    return ("Arrived \(formattedTime) Early", .green, "checkmark.circle.fill", false)
                 }
             }
             return ("Arrived", .green, "checkmark.circle.fill", false)
         }
-        
+
         // In flight status
         if flight.isInProgress {
             if let arrivalDelay = flight.arrivalDelay, arrivalDelay > 900 {
-                let minutes = arrivalDelay / 60
-                return ("En Route • \(minutes)m Late", .orange, "airplane", true)
+                let formattedTime = arrivalDelay.formattedDelay()
+                return ("En Route • \(formattedTime) Late", .orange, "airplane", true)
             }
             return ("En Route", .green, "airplane", true)
         }
-        
+
         // Pre-departure status
         if let departureDelay = flight.departureDelay, departureDelay > 0 {
+            let formattedTime = departureDelay.formattedDelay()
             let minutes = departureDelay / 60
             if minutes >= 30 {
-                return ("Delayed \(minutes)m", .red, "exclamationmark.triangle.fill", false)
+                return ("Delayed \(formattedTime)", .red, "exclamationmark.triangle.fill", false)
             } else {
-                return ("Delayed \(minutes)m", .orange, "clock.fill", false)
+                return ("Delayed \(formattedTime)", .orange, "clock.fill", false)
             }
         }
-        
+
         if let scheduledOut = flight.scheduledOut,
            let date = ISO8601DateFormatter().date(from: scheduledOut),
            date > Date() {
             return ("Scheduled", .blue, "clock", false)
         }
-        
+
         return ("On Time", .green, "checkmark.circle", false)
     }
     
@@ -140,15 +141,15 @@ struct FlightHeroSection: View {
             }
             
             // Prominent delay warning for pre-departure flights
-            if let departureDelay = flight.departureDelay, 
+            if let departureDelay = flight.departureDelay,
                departureDelay > 600, // 10+ minutes
                flight.actualOff == nil { // hasn't departed yet
-                let minutes = departureDelay / 60
-                
+                let formattedDelay = departureDelay.formattedDelay()
+
                 HStack(spacing: 8) {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .foregroundColor(.orange)
-                    Text("Departure delayed by \(minutes) minutes")
+                    Text("Departure delayed by \(formattedDelay)")
                         .font(.subheadline)
                         .fontWeight(.medium)
                     Spacer()

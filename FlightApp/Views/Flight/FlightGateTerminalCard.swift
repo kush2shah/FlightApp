@@ -102,39 +102,6 @@ struct FlightGateTerminalCard: View {
     }
 }
 
-struct InfoRow: View {
-    let icon: String
-    let label: String
-    let value: String
-    var alignment: HorizontalAlignment = .leading
-    
-    var body: some View {
-        VStack(alignment: alignment, spacing: 2) {
-            HStack(spacing: 4) {
-                if alignment == .trailing {
-                    Text(label)
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                    Image(systemName: icon)
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                } else {
-                    Image(systemName: icon)
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                    Text(label)
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                }
-            }
-            
-            Text(value)
-                .font(.subheadline)
-                .fontWeight(.semibold)
-        }
-    }
-}
-
 #Preview {
     Text("Preview requires AeroFlight data")
 }

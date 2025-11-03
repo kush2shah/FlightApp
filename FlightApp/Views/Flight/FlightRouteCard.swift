@@ -99,15 +99,15 @@ struct FlightRouteCard: View {
     
     // Arrival delay view for in-flight
     private func arrivalDelayView(delay: Int) -> some View {
-        let minutes = abs(delay) / 60
         let isLate = delay > 0
-        
+        let formattedTime = abs(delay).formattedDelay()
+
         return HStack(spacing: 6) {
             Image(systemName: isLate ? "clock.arrow.circlepath" : "speedometer")
                 .font(.caption)
                 .foregroundColor(isLate ? .orange : .green)
-            
-            Text(isLate ? "Arriving \(minutes)m late" : "Arriving \(minutes)m early")
+
+            Text(isLate ? "Arriving \(formattedTime) late" : "Arriving \(formattedTime) early")
                 .font(.caption)
                 .fontWeight(.medium)
                 .foregroundColor(isLate ? .orange : .green)
@@ -133,11 +133,11 @@ struct FlightRouteCard: View {
                 .foregroundColor(.green)
             
             Spacer()
-            
+
             if let arrivalDelay = flight.arrivalDelay, abs(arrivalDelay) > 300 {
-                let minutes = abs(arrivalDelay) / 60
                 let isLate = arrivalDelay > 0
-                Text(isLate ? "\(minutes)m late" : "\(minutes)m early")
+                let formattedTime = abs(arrivalDelay).formattedDelay()
+                Text(isLate ? "\(formattedTime) late" : "\(formattedTime) early")
                     .font(.caption)
                     .foregroundColor(isLate ? .orange : .green)
             }

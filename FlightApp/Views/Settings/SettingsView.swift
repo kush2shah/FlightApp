@@ -12,6 +12,7 @@ struct SettingsButton: View {
     @StateObject private var featureFlags = FeatureFlags.shared
     @StateObject private var awardPreferences = AwardPreferences.shared
     @AppStorage("hapticIntensity") private var hapticIntensity: HapticIntensity = .aggressive
+    @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
 
     var body: some View {
         Menu {
@@ -109,8 +110,15 @@ struct SettingsButton: View {
                 }
             }
 
-            // About Section
+            // App Section
             Section {
+                Button {
+                    HapticManager.shared.impact(.medium)
+                    hasCompletedOnboarding = false
+                } label: {
+                    Label("Reset Onboarding", systemImage: "arrow.counterclockwise")
+                }
+
                 Label("Version 0.1", systemImage: "info.circle")
             }
         } label: {

@@ -13,6 +13,9 @@ class RouteViewModel: ObservableObject {
     @Published var currentFlights: [AeroFlight] = []
     @Published var awards: [AwardAvailability] = []
     @Published var awardFilters = AwardPreferences.shared.createDefaultFilters()
+    @Published var cashOffers: [FlightOffer] = []
+    @Published var isLoadingCashPrices = false
+    @Published var cashPriceError: Error?
     @Published var isLoading = false
     @Published var error: String?
     @Published var originAirport: AeroAirport?
@@ -106,6 +109,7 @@ class RouteViewModel: ObservableObject {
             group.addTask { await self.loadRouteInfo(origin: origin, destination: destination) }
             group.addTask { await self.loadFlights(origin: origin, destination: destination) }
             group.addTask { await self.loadAwards(origin: origin, destination: destination) }
+            group.addTask { await self.loadCashPrices(origin: origin, destination: destination) }
         }
 
         isLoading = false
@@ -213,6 +217,111 @@ class RouteViewModel: ObservableObject {
             print("🔍 [AWARDS] Error details: \(error.localizedDescription)")
             // Award data is optional, don't show error
         }
+    }
+
+    private func loadCashPrices(origin: String, destination: String) async {
+        print("💵 [AMADEUS] Starting cash price search for \(origin) → \(destination)")
+
+        guard FeatureFlags.shared.canUseAmadeus else {
+            print("ℹ️ [AMADEUS] Amadeus disabled, skipping cash price search")
+            return
+        }
+
+        isLoadingCashPrices = true
+        cashPriceError = nil
+
+        do {
+            // Convert ICAO to IATA if needed
+            let originIATA = SearchInputParser.shared.icaoToIata(origin)
+            let destIATA = SearchInputParser.shared.icaoToIata(destination)
+
+            print("🔄 [AMADEUS] Converted codes: \(origin) → \(originIATA), \(destination) → \(destIATA)")
+
+            // Search next 7 days for simplicity
+            var allOffers: [FlightOffer] = []
+            let dateFormatter = DateFormatter()
+            dateFormatter.dateFormat = "yyyy-MM-dd"
+
+            for dayOffset in 0..<7 {
+                guard let searchDate = Calendar.current.date(byAdding: .day, value: dayOffset, to: Date()) else {
+                    continue
+                }
+
+                let dateString = dateFormatter.string(from: searchDate)
+
+                let params = AmadeusAPIService.FlightSearchParams(
+                    originLocationCode: originIATA,
+                    destinationLocationCode: destIATA,
+                    departureDate: dateString,
+                    adults: 1,
+                    travelClass: nil,  // All classes
+                    max: 5  // Limit to 5 offers per day
+                )
+
+                let offers = try await AmadeusAPIService.shared.searchFlightOffers(params: params)
+                allOffers.append(contentsOf: offers)
+                print("✅ [AMADEUS] Found \(offers.count) offers for \(dateString)")
+            }
+
+            // Filter out unreasonably long itineraries (>2x typical nonstop duration)
+            // For transatlantic routes like JFK-LHR, nonstop is ~7-8hrs, so filter >16hrs
+            let filteredOffers = allOffers.filter { offer in
+                guard let duration = offer.outbound?.duration else { return true }
+                // Extract hours from ISO 8601 duration (e.g., "PT7H30M" → 7.5)
+                let hours = parseDurationHours(duration)
+                return hours < 16  // Filter out multi-stop itineraries with long layovers
+            }
+
+            // Smart sorting: prioritize nonstop, then duration, then price
+            cashOffers = filteredOffers.sorted { offer1, offer2 in
+                // 1. Prioritize nonstop flights
+                if offer1.numberOfStops != offer2.numberOfStops {
+                    return offer1.numberOfStops < offer2.numberOfStops
+                }
+
+                // 2. For same number of stops, prioritize shorter duration
+                let duration1 = offer1.outbound?.duration ?? "PT99H"
+                let duration2 = offer2.outbound?.duration ?? "PT99H"
+                if duration1 != duration2 {
+                    return duration1 < duration2
+                }
+
+                // 3. Finally, sort by price
+                return offer1.totalPrice < offer2.totalPrice
+            }
+            print("✅ [AMADEUS] Loaded total of \(allOffers.count) cash price options (sorted by stops → duration → price)")
+
+        } catch {
+            print("⚠️ [AMADEUS] Failed to load cash prices: \(error)")
+            cashPriceError = error
+        }
+
+        isLoadingCashPrices = false
+    }
+
+    // Helper to parse ISO 8601 duration to hours
+    private func parseDurationHours(_ duration: String) -> Double {
+        // Parse "PT7H30M" format
+        var result = 0.0
+        let components = duration.replacingOccurrences(of: "PT", with: "")
+
+        if let hRange = components.range(of: "H") {
+            let hours = String(components[..<hRange.lowerBound])
+            result += Double(hours) ?? 0
+        }
+
+        if let mRange = components.range(of: "M") {
+            var minuteStr = components
+            if let hRange = components.range(of: "H") {
+                minuteStr = String(components[hRange.upperBound..<mRange.lowerBound])
+            } else {
+                minuteStr = String(components[..<mRange.lowerBound])
+            }
+            let minutes = Double(minuteStr) ?? 0
+            result += minutes / 60.0
+        }
+
+        return result
     }
 
     // Get route info for booking URLs

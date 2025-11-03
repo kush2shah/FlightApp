@@ -406,8 +406,8 @@ struct EnhancedFlightSelectionCard: View {
         }
         
         if let departureDelay = flight.departureDelay, departureDelay > 0 {
-            let minutes = departureDelay / 60
-            return ("Delayed \(minutes)m", .orange)
+            let formattedTime = departureDelay.formattedDelay()
+            return ("Delayed \(formattedTime)", .orange)
         }
         
         if let scheduledOut = flight.scheduledOut,
