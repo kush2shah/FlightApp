@@ -1,6 +1,6 @@
 # FlightApp ✈️
 
-A personal iOS flight tracking app built with SwiftUI and FlightAware's AeroAPI.
+A personal iOS flight tracking app built with SwiftUI that combines real-time flight data, award availability, and cash price comparison.
 
 ## About
 
@@ -9,179 +9,154 @@ FlightApp started as a passion project combining my love for travel and curiosit
 This project serves multiple learning goals:
 - **iOS Development**: Hands-on experience with Swift/SwiftUI and industry-grade APIs
 - **AI-Assisted Development**: Exploring how AI tools can accelerate prototype development and code refinement
-- **Industry API Integration**: Working with FlightAware's AeroAPI to understand real-world data patterns
+- **Industry API Integration**: Working with FlightAware's AeroAPI, Amadeus API, and Seats.aero
 - **App Store Connect**: Taking a project from concept to App Store submission solo
-- **Prioritization**: Working on prioritzing what's important so the product can get into people's hands asap
+- **Prioritization**: Working on prioritizing what's important so the product can get into people's hands asap
 
 *Note: This is a snapshot-in-time personal project. Features and functionality may evolve or change over time as I continue learning and experimenting.*
 
 ## Features
 
+### Flight Tracking
 - **Real-time Flight Tracking**: Live flight status, departure/arrival times, and progress tracking
 - **Interactive Route Maps**: Visual flight paths with waypoints using MapKit
 - **Comprehensive Flight Details**: Aircraft information, airports, delays, and more
+- **International Waypoint Database**: 31,774+ waypoints with ARINC 424 support for accurate route visualization
+
+### Route Intelligence
 - **Route Visualization**: Enhanced mapping with VOR/DME/NDB navigation points
+- **Current Flights**: See what flights are currently operating on a route
+- **Award Availability**: Integration with Seats.aero for mileage redemption options
+- **Cash Price Comparison**: Amadeus API integration for comparing cash vs. award prices
+
+### Search Experience
+- **Unified Search Bar**: Search by flight number or route with intelligent airport matching
+- **Airport Search**: Fuzzy search across IATA codes, ICAO codes, city names, and airport names
+- **Smart Suggestions**: Context-aware suggestions including popular airports and destinations
+- **Liquid Glass Design**: Premium glass morphism effects with haptic feedback throughout
 
 ## Technical Stack
 
 - **iOS**: SwiftUI, MapKit, Combine
-- **API**: FlightAware AeroAPI for real-time flight data
-- **Data**: Navigation database with international waypoints
+- **APIs**:
+  - FlightAware AeroAPI for real-time flight data
+  - Amadeus Self-Service API for cash flight prices
+  - Seats.aero API for award availability
+- **Data**: Navigation database with international waypoints, airport coordinates
 - **Architecture**: MVVM pattern with async/await
+- **Design System**: Liquid glass aesthetic with airline branding and haptic feedback
 - **Development**: Claude was used as a peer in building this
 
-## Development History & Current Status
+## Current Status
 
-### Enhanced Home Screen & Search Experience (Current Branch: `map-centric-search`)
+**Branch**: `route-visibility`
+**Main Branch**: `main`
 
-**Goal**: Transform the app into a search-centric experience where the search bar is the hero element, making flight discovery addictive and engaging.
+### Recent Developments
 
-#### ✅ Completed Work
+#### ✅ Amadeus Cash Price Integration
+- Implemented Amadeus API service with OAuth2 authentication
+- Created FlightOffer data models for pricing information
+- Added CashPriceCard component to display flight options
+- Integrated cash prices into RouteView alongside award availability
+- Implemented request caching and rate limiting
 
-1. **Hero Search Bar Implementation**
-   - Redesigned FlightSearchView with centered, prominent search bar
-   - Added large typography ("Track Any Flight" title)
-   - Implemented focus animations and visual feedback
-   - Added clear button and enhanced search field styling
+#### ✅ Liquid Glass Route Search
+- Unified search bar supporting both flight numbers and routes
+- Intelligent airport search with fuzzy matching and smart ranking
+- Context-aware suggestions (popular airports, popular destinations from selected origin)
+- Smooth animations and haptic feedback patterns
+- Flag emojis for instant country recognition
 
-2. **UI/UX Improvements**
-   - Moved popular routes to subtle overflow menu with SF Symbols
-   - Clean gradient background design
-   - Reduced visual clutter to focus on search
-   - Added search hint buttons (AA1, UA60, BA175)
-
-3. **Critical Bug Fixes**
-   - **Oceanic coordinate parsing**: Fixed DDMM format parsing crash
-     - `0649N08043E` now correctly parsed as `6.816°N, 80.716°E`
-     - Prevents MapKit "Invalid Region" crashes
-   - **Flight date filtering**: Fixed random historical dates issue
-     - Added `start` parameter to AeroAPI calls for current/upcoming flights only
-   - **Search messaging**: Updated UI to reflect actual capabilities (flight numbers only)
-
-#### 🔄 Current Status
-
-**Branch**: `map-centric-search`  
-**Last Commit**: `828c8fb` - Fix flight date filtering  
-
-**What Works**:
-- Hero search bar with animations and focus states
-- Popular routes accessible via overflow menu (ellipsis icon)
-- Coordinate parsing fixed (no more app crashes)
-- Date filtering shows relevant flights only
-- Enhanced visual design with gradients and shadows
-
-#### 📋 Next Steps (Pending Implementation)
-
-1. **Enhanced Search Experience**
-   - Real-time search suggestions as user types
-   - Search history integration with better UX
-   - Haptic feedback on search interactions
-
-2. **Advanced Search Animations**
-   - Smooth focus/unfocus transitions  
-   - Premium loading state animations
-   - Enhanced visual feedback systems
-
-3. **Map Background Integration** (Future Vision)
-   - Replace current background with interactive world map
-   - Floating search bar overlay on map
-   - Search → map zoom → route trace → detail overlay flow
-   - "Commanding a global view" user experience
-
-### Previous Major Development
-
-#### International Route Tracking System (`enhanced-route-mapping` branch)
-- Comprehensive ARINC 424 waypoint database (31,774+ waypoints)
-- Complex oceanic coordinate parsing for international flights
-- Advanced route string parsing for multi-waypoint paths
-- Enhanced MapKit integration with custom annotations
-
-#### Navigation Database Integration
-- CSV-based waypoint loading with fallback mechanisms
-- Support for VOR, DME, NDB navigation aids
-- Geographic coordinate validation and error handling
-- Real-time waypoint resolution for flight routes
-
-## Technical Architecture
+#### ✅ Enhanced Route Experience
+- Comprehensive route information with IFR routes, current flights, and awards
+- Side-by-side comparison of cash prices vs. award availability
+- Interactive maps with great circle routes
+- Airline branding throughout the experience
 
 ### Key Services
-- **AeroAPIService**: Flight data fetching with proper date filtering
-- **WaypointDatabaseService**: International waypoint resolution with coordinate fixes
-- **PopularRouteStore**: Sample flight management with featured routes
+- **AeroAPIService**: Flight data fetching with caching
+- **AmadeusAPIService**: Cash flight price searches
+- **SeatsAeroAPIService**: Award availability lookup
+- **AirportSearchService**: Intelligent airport search and suggestions
+- **WaypointDatabaseService**: International waypoint resolution
+- **HapticManager**: Centralized haptic feedback patterns
 
-### Enhanced Data Models  
+### Data Models
 - **AeroFlight**: FlightAware API response with null-safety
+- **FlightOffer**: Amadeus pricing and itinerary data
+- **Airport**: Rich airport model with coordinates and metadata
 - **FlightTime**: Advanced time/date formatting with timezone support
 - **WaypointData**: Comprehensive navigation database entries
 
-### Current UI Focus
-- **FlightSearchView**: Hero search experience (heavily redesigned)
+### UI Components
+- **FlightSearchView**: Hero search experience with UnifiedSearchBar
 - **FlightView**: Detailed flight information with route mapping
-- **FlightRouteMapKitView**: Enhanced route visualization
-
-## Search-First Design Philosophy
-
-The current development direction focuses on making search the primary, addictive interaction:
-- Large, centered search bar as the hero element
-- Minimal visual distractions to maintain focus
-- Quick access to sample flights without visual competition
-- Smooth animations that encourage repeated engagement
-
-### Future Vision: Map-Centric Experience
-Planned evolution toward a unique map-integrated experience:
-1. World map as primary background
-2. Floating search interface over interactive map
-3. Seamless search → map zoom → route trace → detail overlay
-4. Users feel like they're "commanding a global view" of aviation
+- **RouteView**: Route visualization with cash prices, awards, and current flights
+- **CashPriceCard**: Clean display of flight options with pricing
+- **GlassEffectContainer**: Reusable liquid glass styling
 
 ## Development Setup
 
+### API Credentials Required
+You'll need API keys from:
+1. **FlightAware AeroAPI** - Real-time flight data
+2. **Amadeus Self-Service API** - Cash flight prices (test & production keys)
+3. **Seats.aero API** - Award availability
+
+Add these to `Config.xcconfig` (use `Config-Template.xcconfig` as a guide).
+
 ### Testing Flights (Verified Working)
 - **AA1** (JFK-LAX) - Featured domestic route
-- **UA60** (SFO-MEL) - Long-haul international
+- **UA60** (SFO-MEL) - Long-haul international with transpacific routing
 - **BA175** (LHR-JFK) - Reliable transatlantic service
 
-### Key Modified Files
-- `FlightSearchView.swift` - Complete hero search redesign
-- `AeroAPIService.swift` - Enhanced with proper date filtering  
-- `WaypointDatabaseService.swift` - Critical coordinate parsing fixes applied
-- `PopularRouteStore.swift` - Sample flights with featured route system
+### Testing Routes (Verified Working)
+- **JFK → LHR** - Popular transatlantic route
+- **SFO → NRT** - Transpacific route
+- **LAX → SYD** - Long-haul route with award availability
 
-## Known Limitations & Next Session Goals
+## Architecture Highlights
 
-**Current Limitations**:
-- Search supports flight numbers only (airports/airlines not implemented)
-- Map background integration pending
-- Real-time search suggestions not yet added
+### Async Data Loading
+All route data loads in parallel without blocking:
+- IFR routes
+- Current flights
+- Award availability
+- Cash prices
 
-**When Resuming Development**:
-1. Continue with pending todos for enhanced search experience
-2. Begin map background integration work
-3. Implement search-to-map transition animations
-4. Add real-time search suggestions and autocomplete
+Each service operates independently with proper error handling.
 
-The foundation for a search-centric, map-integrated flight tracking experience is now solidly in place, with critical bugs resolved and a clear path forward.
+### Caching Strategy
+- **API Response Caching**: 1-hour TTL for Amadeus and Seats.aero
+- **Request Deduplication**: Prevents duplicate simultaneous requests
+- **Token Caching**: OAuth2 tokens cached until expiration
 
-## Development Philosophy
+### Error Handling Philosophy
+- Cash prices and awards are nice-to-have, not required
+- Failures don't break core flight tracking functionality
+- User sees friendly error states
+- Detailed logging for debugging
 
-This project represents an exploration of modern development workflows, particularly the role of AI in rapid prototyping and iteration. The goal was to see how quickly a functional, polished app could be built by combining domain knowledge, AI assistance, and traditional development practices.
+## Design Philosophy
 
-### Key Learnings
+This app follows a liquid glass design language:
 
-- Working with real-time aviation data and industry APIs
-- MapKit integration and custom geospatial visualization
-- SwiftUI state management and async operations
-- AI-assisted debugging and feature development
-- Asset management and App Store Connect process
+1. **Liquid Glass**: Smooth glass morphism effects throughout
+2. **Haptic Feedback**: Aggressive, experience-defining patterns (click, forming, breaking, impact)
+3. **Airline Branding**: Colors and logos integrated contextually
+4. **Context-Aware**: Intelligent suggestions based on user state
+5. **Minimal Friction**: Inline experiences, no unnecessary modals
+6. **Delightful Details**: Flag emojis, smooth animations, satisfying interactions
 
 ## Privacy & Terms
 
 FlightApp respects user privacy and only collects necessary flight data for functionality. See [Privacy Policy](https://kushs.org/app-privacy) and [Terms and Conditions](https://kushs.org/app-terms) for details.
 
 ## Contact
- 
+
 Email: hello@kushs.org
 
 ---
 
-*This app is def not affiliated with any airline or aviation authority. Flight data is provided by FlightAware's AeroAPI for informational purposes only.*
+*This app is not affiliated with any airline or aviation authority. Flight data is provided by FlightAware's AeroAPI, Amadeus, and Seats.aero for informational purposes only.*

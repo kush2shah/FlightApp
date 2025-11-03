@@ -10,15 +10,24 @@ import SwiftUI
 struct FlightView: View {
     @Environment(\.dismiss) private var dismiss
     @StateObject private var viewModel = FlightViewModel()
+    @StateObject private var trackedFlightsStore = TrackedFlightsStore()
     let flightNumber: String
     let faFlightId: String?
     let skipFlightSelection: Bool
+    let originCode: String?
+    let destinationCode: String?
 
     // Add an initializer with default parameter
-    init(flightNumber: String, faFlightId: String? = nil, skipFlightSelection: Bool = false) {
+    init(flightNumber: String, faFlightId: String? = nil, skipFlightSelection: Bool = false, originCode: String? = nil, destinationCode: String? = nil) {
         self.flightNumber = flightNumber
         self.faFlightId = faFlightId
         self.skipFlightSelection = skipFlightSelection
+        self.originCode = originCode
+        self.destinationCode = destinationCode
+    }
+
+    private var isTracked: Bool {
+        trackedFlightsStore.isTracking(flightNumber: flightNumber)
     }
     
     var body: some View {
@@ -82,6 +91,16 @@ struct FlightView: View {
         .toolbar {
             ToolbarItem(placement: .navigationBarLeading) {
                 SettingsButton()
+            }
+
+            if FeatureFlags.shared.canUseTrackedFlights {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button(action: toggleTracking) {
+                        Image(systemName: isTracked ? "star.fill" : "star")
+                            .foregroundStyle(isTracked ? .yellow : .secondary)
+                            .font(.system(size: 20))
+                    }
+                }
             }
         }
         .sheet(isPresented: $viewModel.showFlightSelection) {
@@ -177,6 +196,28 @@ struct FlightView: View {
                 .padding()
                 .glassEffect(.regular, in: .rect(cornerRadius: 12))
             }
+        }
+    }
+
+    // MARK: - Actions
+
+    private func toggleTracking() {
+        guard let flight = viewModel.currentFlight else { return }
+
+        if isTracked {
+            // Remove from tracked flights
+            if let tracked = trackedFlightsStore.trackedFlights.first(where: { $0.flightNumber.lowercased() == flightNumber.lowercased() }) {
+                trackedFlightsStore.removeFlight(tracked)
+                HapticManager.shared.impact(.light)
+            }
+        } else {
+            // Add to tracked flights
+            let trackedFlight = TrackedFlight.from(
+                flight: flight,
+                airlineName: viewModel.airlineProfile?.name
+            )
+            trackedFlightsStore.addFlight(trackedFlight)
+            HapticManager.shared.notificationOccurred(.success)
         }
     }
 }
@@ -424,7 +465,10 @@ struct EnhancedFlightSelectionCard: View {
             // Flight header with time and status
             HStack {
                 VStack(alignment: .leading) {
-                    Text("\(flight.operatorIata ?? flight.operator_ ?? "") \(flight.flightNumber ?? flight.ident)")
+                    Text(flight.operatorName)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Text(flight.flightNumber ?? flight.ident)
                         .font(.headline)
                     Text(flightTime)
                         .font(.title2)

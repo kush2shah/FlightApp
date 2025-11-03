@@ -33,6 +33,19 @@ struct AeroFlight: Codable, Identifiable {
     let operator_: String?
     let operatorIcao: String?
     let operatorIata: String?
+
+    /// Friendly airline name from operator code
+    var operatorName: String {
+        // Try IATA first, then ICAO, then fallback to operator_ string
+        if let iata = operatorIata {
+            return AirlineNameService.shared.getAirlineName(from: iata)
+        } else if let icao = operatorIcao {
+            return AirlineNameService.shared.getAirlineName(from: icao)
+        } else if let op = operator_ {
+            return AirlineNameService.shared.getAirlineName(from: op)
+        }
+        return ""
+    }
     let flightNumber: String?
     let registration: String?
     let atcIdent: String?
@@ -193,12 +206,14 @@ struct AeroAirport: Codable {
     let timezone: String?
     let name: String?
     let city: String?
-    
+    let latitude: Double?
+    let longitude: Double?
+
     // Prefer IATA code, fallback to ICAO or generic code
     var displayCode: String {
         return codeIata ?? codeIcao ?? code
     }
-    
+
     enum CodingKeys: String, CodingKey {
         case code
         case codeIcao = "code_icao"
@@ -206,6 +221,8 @@ struct AeroAirport: Codable {
         case timezone
         case name
         case city
+        case latitude
+        case longitude
     }
 }
 

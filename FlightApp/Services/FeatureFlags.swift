@@ -15,6 +15,7 @@ class FeatureFlags: ObservableObject {
     @AppStorage("seatsAeroEnabled") var isSeatsAeroEnabled: Bool = true
     @AppStorage("amadeusEnabled") var isAmadeusEnabled: Bool = true
     @AppStorage("amadeusProduction") var isAmadeusProduction: Bool = false
+    @AppStorage("trackedFlightsEnabled") var isTrackedFlightsEnabled: Bool = false
 
     /// Check if Seats.aero API integration is enabled
     var canUseSeatsAero: Bool {
@@ -24,6 +25,11 @@ class FeatureFlags: ObservableObject {
     /// Check if Amadeus API integration is enabled
     var canUseAmadeus: Bool {
         isAmadeusEnabled
+    }
+
+    /// Check if tracked flights feature is enabled
+    var canUseTrackedFlights: Bool {
+        isTrackedFlightsEnabled
     }
 
     private init() {}

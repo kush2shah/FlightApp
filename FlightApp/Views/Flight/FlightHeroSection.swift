@@ -66,8 +66,6 @@ struct FlightHeroSection: View {
         AirlineColorService.shared.getBrandColors(for: airlineCode)
     }
 
-    @State private var airlineName: String?
-
     var body: some View {
         VStack(spacing: 16) {
             // Flight identifier with date and airline logo
@@ -78,16 +76,10 @@ struct FlightHeroSection: View {
                 }
 
                 VStack(alignment: .leading, spacing: 4) {
-                    // Airline name (if available)
-                    if let name = airlineName {
-                        Text(name)
-                            .font(.sfRounded(size: 13, weight: .medium))
-                            .foregroundColor(.secondary)
-                    } else {
-                        Text(flight.operatorIata ?? flight.operator_ ?? "")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
+                    // Airline name
+                    Text(flight.operatorName)
+                        .font(.sfRounded(size: 13, weight: .medium))
+                        .foregroundColor(.secondary)
 
                     Text(flight.flightNumber ?? flight.ident)
                         .font(.largeTitle)
@@ -136,10 +128,7 @@ struct FlightHeroSection: View {
                     }
                 }
             }
-            .onAppear {
-                loadAirlineName()
-            }
-            
+
             // Prominent delay warning for pre-departure flights
             if let departureDelay = flight.departureDelay,
                departureDelay > 600, // 10+ minutes
@@ -192,21 +181,6 @@ struct FlightHeroSection: View {
         .padding()
         .brandedGlassEffect(colors: brandColors, cornerRadius: 20, intensity: 0.25)
         .shadow(color: Color.black.opacity(0.1), radius: 15, x: 0, y: 5)
-    }
-
-    private func loadAirlineName() {
-        guard let code = airlineCode else { return }
-
-        Task {
-            do {
-                let airlineProfile = try await AirlineService.shared.getAirlineInfo(code: code)
-                await MainActor.run {
-                    self.airlineName = airlineProfile.name
-                }
-            } catch {
-                print("⚠️ Failed to load airline name: \(error)")
-            }
-        }
     }
 }
 
