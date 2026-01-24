@@ -5,18 +5,18 @@ meta {
 }
 
 get {
-  url: {{baseUrl}}/flights/:id/track
+  url: {{baseUrl}}/flights/:id/track?include_estimated_positions=true
   body: none
   auth: none
 }
 
 params:query {
-  ~include_estimated_positions: 
+  include_estimated_positions: true
   ~include_surface_positions: 
 }
 
 params:path {
-  id: 
+  id: SIA23-1763623300-airline-2649p
 }
 
 headers {

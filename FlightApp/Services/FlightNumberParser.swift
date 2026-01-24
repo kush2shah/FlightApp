@@ -22,7 +22,8 @@ class FlightNumberParser {
         // Flight number pattern: 2-3 character airline code (letters/numbers) + optional space + 1-4 digit flight number
         // Examples: AA1, B6123, F9102, UA60, DL1234
         // Airline code can be alphanumeric (B6, F9, etc.) but flight number is always numeric
-        let pattern = "^([A-Z0-9]{2,3})\\s?([0-9]{1,4})$"
+        // Use non-greedy matching for airline code to prefer 2 characters when possible
+        let pattern = "^([A-Z0-9]{2,3}?)\\s?([0-9]{1,4})$"
 
         guard let regex = try? NSRegularExpression(pattern: pattern),
               let match = regex.firstMatch(in: cleaned, range: NSRange(cleaned.startIndex..., in: cleaned)) else {

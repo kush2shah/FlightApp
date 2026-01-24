@@ -20,6 +20,7 @@ struct FlightSearchView: View {
     @State private var showTrackedFlights = false
 
     @StateObject private var recentSearchStore = RecentSearchStore()
+    @StateObject private var recentRouteStore = RecentRouteStore()
     @State private var refreshTrigger = 0
     private let haptics = HapticManager.shared
 
@@ -45,6 +46,12 @@ struct FlightSearchView: View {
                         // Recent flights section
                         if !recentSearchStore.recentSearches.isEmpty {
                             recentFlightsSection
+                                .padding(.bottom, 32)
+                        }
+
+                        // Recent routes section
+                        if !recentRouteStore.recentRoutes.isEmpty {
+                            recentRoutesSection
                                 .padding(.bottom, 32)
                         }
 
@@ -167,6 +174,8 @@ struct FlightSearchView: View {
                     }
                     .onDisappear {
                         haptics.sheetClosed()
+                        // Save route to recent routes when view closes
+                        saveRecentRoute(origin: route.origin, destination: route.destination)
                     }
             }
             .alert("Search Error", isPresented: $showErrorAlert, actions: {
@@ -222,6 +231,40 @@ struct FlightSearchView: View {
                             withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                                 haptics.cardDeleted()
                                 recentSearchStore.removeSearch(search)
+                            }
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
+                    }
+            }
+        }
+    }
+
+    // MARK: - Recent Routes Section
+
+    private var recentRoutesSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Text("Your Routes")
+                    .font(.sfRounded(size: 28, weight: .bold))
+                    .foregroundColor(.primary)
+                Spacer()
+            }
+
+            ForEach(Array(recentRouteStore.recentRoutes.prefix(3).enumerated()), id: \.element.id) { index, route in
+                RecentRouteCard(route: route)
+                    .onAppear {
+                        haptics.cardAppeared(delay: Double(index) * 0.05)
+                    }
+                    .onTapGesture {
+                        haptics.cardTapped()
+                        selectRecentRoute(route)
+                    }
+                    .contextMenu {
+                        Button(role: .destructive) {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                haptics.cardDeleted()
+                                recentRouteStore.removeRoute(route)
                             }
                         } label: {
                             Label("Delete", systemImage: "trash")
@@ -312,6 +355,10 @@ struct FlightSearchView: View {
         selectedFlightNumber = IdentifiableString(value: search.route, faFlightId: nil)
     }
 
+    private func selectRecentRoute(_ route: RecentRoute) {
+        selectedRoute = RouteIdentifier(origin: route.originCode, destination: route.destinationCode)
+    }
+
     private func addToRecentSearches(flightData: RecentFlightData) {
         guard let flightNumber = selectedFlightNumber?.value else { return }
         recentSearchStore.addSearch(flightNumber, type: .flightNumber, flightData: flightData)
@@ -361,6 +408,16 @@ struct FlightSearchView: View {
         // Fetch fresh data
         updateRecentSearchFromFlightView(flightNumber: flightNumber)
         haptics.impact(.medium)
+    }
+
+    private func saveRecentRoute(origin: String, destination: String) {
+        // Save route with basic codes - airport metadata will be populated if available
+        // The RouteView will have already loaded this data, so we just save what we know
+        let route = RecentRoute(
+            originCode: origin,
+            destinationCode: destination
+        )
+        recentRouteStore.addRoute(route)
     }
 }
 
@@ -593,6 +650,67 @@ private struct SimpleFlightCard: View {
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .short
         return formatter.localizedString(for: search.timestamp, relativeTo: Date())
+    }
+}
+
+// MARK: - Recent Route Card
+
+private struct RecentRouteCard: View {
+    let route: RecentRoute
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            // Route display
+            HStack(alignment: .center, spacing: 12) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(route.originCode)
+                        .font(.sfRounded(size: 28, weight: .bold))
+                    if let city = route.originCity {
+                        Text(city)
+                            .font(.sfRounded(size: 13))
+                            .foregroundColor(.secondary)
+                    }
+                }
+
+                Spacer()
+
+                Image(systemName: "arrow.right")
+                    .font(.system(size: 20, weight: .medium))
+                    .foregroundColor(.blue)
+
+                Spacer()
+
+                VStack(alignment: .trailing, spacing: 4) {
+                    Text(route.destinationCode)
+                        .font(.sfRounded(size: 28, weight: .bold))
+                    if let city = route.destinationCity {
+                        Text(city)
+                            .font(.sfRounded(size: 13))
+                            .foregroundColor(.secondary)
+                    }
+                }
+            }
+
+            // Airport names if available
+            if let originName = route.originName, let destName = route.destinationName {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(originName)
+                        .font(.sfRounded(size: 11))
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                    Text(destName)
+                        .font(.sfRounded(size: 11))
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                }
+            }
+        }
+        .padding(20)
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(Color(.systemBackground))
+                .shadow(color: Color.black.opacity(0.08), radius: 12, x: 0, y: 4)
+        )
     }
 }
 

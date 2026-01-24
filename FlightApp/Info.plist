@@ -16,6 +16,8 @@
 	<string>$(AMADEUS_PROD_KEY)</string>
 	<key>AMADEUS_PROD_SECRET</key>
 	<string>$(AMADEUS_PROD_SECRET)</string>
+	<key>ANTHROPIC_KEY</key>
+	<string>$(ANTHROPIC_KEY)</string>
 	<key>UIBackgroundModes</key>
 	<array/>
 </dict>

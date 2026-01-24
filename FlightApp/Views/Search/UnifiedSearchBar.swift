@@ -333,6 +333,7 @@ struct UnifiedSearchBar: View {
                             Text(name)
                                 .font(.sfRounded(size: 16, weight: .semibold))
                                 .foregroundColor(.primary)
+                                .lineLimit(1)
                         } else {
                             // Show code while loading
                             Text(airlineCode)
@@ -343,6 +344,7 @@ struct UnifiedSearchBar: View {
                         Text("Flight \(searchText.uppercased())")
                             .font(.sfRounded(size: 14))
                             .foregroundColor(.secondary)
+                            .fixedSize(horizontal: true, vertical: false)
                     }
 
                     Spacer()
@@ -404,6 +406,10 @@ struct UnifiedSearchBar: View {
                         set: {
                             selectedDate = $0
                             showDatePicker = false
+                            // Auto-submit when date is selected via date picker
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                                handleSubmit()
+                            }
                         }
                     ), displayedComponents: .date)
                     .datePickerStyle(.graphical)
@@ -414,7 +420,7 @@ struct UnifiedSearchBar: View {
 
             // Search hint
             HStack {
-                Text(selectedDate == nil ? "Select a date to search" : "Press return to search")
+                Text(selectedDate == nil ? "Select a date to search" : "Searching...")
                     .font(.sfRounded(size: 14))
                     .foregroundColor(.secondary)
                 Spacer()
@@ -462,6 +468,10 @@ struct UnifiedSearchBar: View {
             selectedDate = date
             showDatePicker = false
             haptics.impact(.light)
+            // Auto-submit when date is selected via quick button
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                handleSubmit()
+            }
         }) {
             Text(label)
                 .font(.sfRounded(size: 14, weight: .medium))

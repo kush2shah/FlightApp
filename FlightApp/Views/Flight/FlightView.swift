@@ -63,6 +63,29 @@ struct FlightView: View {
                             // Aircraft and route details
                             FlightAircraftCard(flight: flight)
 
+                            // Aircraft insights
+                            if let aircraftType = flight.aircraftType {
+                                InsightCard(
+                                    type: .aircraft,
+                                    context: InsightContext(
+                                        flightNumber: flight.ident,
+                                        airline: flight.operatorName,
+                                        aircraftType: aircraftType
+                                    ),
+                                    airlineColors: AirlineColorService.shared.getBrandColors(for: flight.operatorIata)
+                                )
+                            }
+
+                            // Destination insights
+                            InsightCard(
+                                type: .destination,
+                                context: InsightContext(
+                                    destinationAirport: flight.destination.code,
+                                    destinationCity: flight.destination.city
+                                ),
+                                airlineColors: AirlineColorService.shared.getBrandColors(for: flight.operatorIata)
+                            )
+
                             // Airline profile section
                             airlineProfileSection
                         }

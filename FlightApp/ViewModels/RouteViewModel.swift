@@ -15,6 +15,8 @@ class RouteViewModel: ObservableObject {
     @Published var awardFilters = AwardPreferences.shared.createDefaultFilters()
     @Published var cashOffers: [FlightOffer] = []
     @Published var isLoadingCashPrices = false
+    @Published var cashPriceLoadingProgress: Double = 0.0
+    @Published var cashPriceLoadingTotal: Int = 7
     @Published var cashPriceError: Error?
     @Published var isLoading = false
     @Published var error: String?
@@ -256,6 +258,8 @@ class RouteViewModel: ObservableObject {
 
         isLoadingCashPrices = true
         cashPriceError = nil
+        cashPriceLoadingProgress = 0.0
+        cashPriceLoadingTotal = 7
 
         // Convert ICAO to IATA if needed
         let originIATA = SearchInputParser.shared.icaoToIata(origin)
@@ -296,8 +300,10 @@ class RouteViewModel: ObservableObject {
             } catch {
                 print("⚠️ [AMADEUS] No offers for \(dateString): \(error)")
                 // Continue to next date instead of failing completely
-                continue
             }
+
+            // Update progress after each API call
+            cashPriceLoadingProgress = Double(dayOffset + 1)
         }
 
         // Filter out unreasonably long itineraries (>2x typical nonstop duration)
