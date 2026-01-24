@@ -8,7 +8,6 @@
 import SwiftUI
 
 struct FlightSearchView: View {
-    @State private var searchText = ""
     @State private var selectedFlightNumber: IdentifiableString?
     @State private var selectedRoute: RouteIdentifier?
     @State private var availableFlights: [AeroFlight] = []
@@ -18,10 +17,10 @@ struct FlightSearchView: View {
     @State private var showErrorAlert = false
     @State private var lastSearchedFlightNumber: String = ""
     @State private var isSearchExpanded = false
-    @FocusState private var isSearchFocused: Bool
-    @Namespace private var searchAnimation
+    @State private var showTrackedFlights = false
 
     @StateObject private var recentSearchStore = RecentSearchStore()
+    @StateObject private var recentRouteStore = RecentRouteStore()
     @State private var refreshTrigger = 0
     private let haptics = HapticManager.shared
 
@@ -50,6 +49,12 @@ struct FlightSearchView: View {
                                 .padding(.bottom, 32)
                         }
 
+                        // Recent routes section
+                        if !recentRouteStore.recentRoutes.isEmpty {
+                            recentRoutesSection
+                                .padding(.bottom, 32)
+                        }
+
                         // Discover section
                         discoverSection
                             .padding(.bottom, 100) // Space for bottom search bar
@@ -57,14 +62,38 @@ struct FlightSearchView: View {
                     .padding(.horizontal, 20)
                 }
 
-                // Adaptive search bar (liquid glass)
-                adaptiveSearchBar
+                // Unified search bar (liquid glass)
+                UnifiedSearchBar(
+                    isActive: $isSearchExpanded,
+                    onFlightSearch: { flightNumber, date in
+                        haptics.searchSubmitted()
+                        searchByFlightNumber(flightNumber, date: date)
+                    },
+                    onRouteSearch: { origin, destination in
+                        haptics.searchSubmitted()
+                        selectedRoute = RouteIdentifier(origin: origin.displayCode, destination: destination.displayCode)
+                    }
+                )
             }
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     SettingsButton()
+                }
+
+                if FeatureFlags.shared.canUseTrackedFlights {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Button(action: {
+                            showTrackedFlights = true
+                            haptics.impact(.light)
+                        }) {
+                            Image(systemName: "star.circle.fill")
+                                .font(.system(size: 24))
+                                .foregroundStyle(.yellow, .white.opacity(0.3))
+                                .symbolRenderingMode(.palette)
+                        }
+                    }
                 }
             }
             .sheet(isPresented: $showFlightSelectionSheet) {
@@ -73,7 +102,6 @@ struct FlightSearchView: View {
                     isSearching: isSearching,
                     onSelect: { selectedFlight in
                         selectedFlightNumber = IdentifiableString(value: selectedFlight.ident, faFlightId: selectedFlight.faFlightId)
-                        isSearchFocused = false
 
                         // Fetch airline name and add to recent searches
                         Task {
@@ -146,6 +174,8 @@ struct FlightSearchView: View {
                     }
                     .onDisappear {
                         haptics.sheetClosed()
+                        // Save route to recent routes when view closes
+                        saveRecentRoute(origin: route.origin, destination: route.destination)
                     }
             }
             .alert("Search Error", isPresented: $showErrorAlert, actions: {
@@ -153,150 +183,22 @@ struct FlightSearchView: View {
             }, message: {
                 Text(searchError ?? "An unknown error occurred")
             })
-        }
-    }
-
-    // MARK: - Adaptive Search Bar (Liquid Glass)
-
-    private var adaptiveSearchBar: some View {
-        ZStack {
-            // Backdrop for expanded state
-            if isSearchExpanded {
-                Color.black.opacity(0.2)
-                    .ignoresSafeArea()
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        dismissSearch()
-                    }
-                    .transition(.opacity)
-            }
-
-            // Single morphing search bar
-            VStack {
-                if isSearchExpanded {
-                    Spacer()
-                        .frame(height: 100)
-                }
-
-                if !isSearchExpanded {
-                    Spacer()
-                }
-
-                // Single unified search bar content
-                VStack(spacing: 0) {
-                    HStack(spacing: 16) {
-                        Image(systemName: "magnifyingglass")
-                            .font(.system(size: isSearchExpanded ? 22 : 20, weight: .medium))
-                            .foregroundColor(.secondary)
-
-                        if isSearchExpanded {
-                            TextField("AA1 or JFK LHR...", text: $searchText)
-                                .font(.sfRounded(size: 20))
-                                .textInputAutocapitalization(.characters)
-                                .autocorrectionDisabled()
-                                .focused($isSearchFocused)
-                                .onSubmit(searchFlight)
-                                .disabled(isSearching)
-                        } else {
-                            Text("Search flight number or route...")
-                                .font(.sfRounded(size: 17))
-                                .foregroundColor(.secondary)
-                        }
-
-                        Spacer()
-
-                        if isSearchExpanded {
-                            if isSearching {
-                                ProgressView()
-                                    .scaleEffect(1.2)
-                            } else if !searchText.isEmpty {
-                                Button(action: {
-                                    haptics.searchCleared()
-                                    searchText = ""
-                                }) {
-                                    Image(systemName: "xmark.circle.fill")
-                                        .font(.system(size: 20))
-                                        .foregroundColor(.secondary)
+            .fullScreenCover(isPresented: $showTrackedFlights) {
+                NavigationStack {
+                    TrackedFlightsView()
+                        .toolbar {
+                            ToolbarItem(placement: .navigationBarTrailing) {
+                                Button("Done") {
+                                    showTrackedFlights = false
+                                    haptics.impact(.light)
                                 }
                             }
                         }
-                    }
-                    .padding(.horizontal, isSearchExpanded ? 24 : 20)
-                    .padding(.vertical, isSearchExpanded ? 20 : 16)
-
-                    // Search hints (only when expanded)
-                    if isSearchExpanded && searchText.isEmpty {
-                        VStack(spacing: 12) {
-                            Divider()
-
-                            HStack(spacing: 12) {
-                                searchHintButton("AA1", icon: "airplane")
-                                searchHintButton("JFK LHR", icon: "arrow.right")
-                            }
-                            .padding(.horizontal, 20)
-                            .padding(.bottom, 16)
-                        }
-                        .transition(.opacity.combined(with: .move(edge: .top)))
-                    }
-                }
-                .glassEffect(.regular, in: .rect(cornerRadius: isSearchExpanded ? 20 : 25))
-                .shadow(
-                    color: Color.black.opacity(isSearchExpanded ? 0.2 : 0.15),
-                    radius: isSearchExpanded ? 30 : 20,
-                    x: 0,
-                    y: isSearchExpanded ? 15 : 10
-                )
-                .padding(.horizontal, 20)
-                .padding(.bottom, isSearchExpanded ? 0 : 20)
-                .glassEffectID("searchBar", in: searchAnimation)
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    if !isSearchExpanded {
-                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                            isSearchExpanded = true
-                            haptics.impact(.heavy)
-                        }
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                            isSearchFocused = true
-                        }
-                    }
-                }
-
-                if !isSearchExpanded {
-                    // No spacer needed, bar stays at bottom
-                } else {
-                    Spacer()
                 }
             }
         }
     }
 
-    private func searchHintButton(_ text: String, icon: String) -> some View {
-        Button(action: {
-            searchText = text
-            searchFlight()
-        }) {
-            HStack(spacing: 8) {
-                Image(systemName: icon)
-                    .font(.system(size: 14, weight: .medium))
-                Text(text)
-                    .font(.sfRounded(size: 15, weight: .medium))
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
-            .background(Color.blue.opacity(0.1))
-            .foregroundColor(.blue)
-            .cornerRadius(12)
-        }
-    }
-
-    private func dismissSearch() {
-        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-            isSearchExpanded = false
-            isSearchFocused = false
-            haptics.impact(.light)
-        }
-    }
 
     // MARK: - Recent Flights Section
 
@@ -338,6 +240,40 @@ struct FlightSearchView: View {
         }
     }
 
+    // MARK: - Recent Routes Section
+
+    private var recentRoutesSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Text("Your Routes")
+                    .font(.sfRounded(size: 28, weight: .bold))
+                    .foregroundColor(.primary)
+                Spacer()
+            }
+
+            ForEach(Array(recentRouteStore.recentRoutes.prefix(3).enumerated()), id: \.element.id) { index, route in
+                RecentRouteCard(route: route)
+                    .onAppear {
+                        haptics.cardAppeared(delay: Double(index) * 0.05)
+                    }
+                    .onTapGesture {
+                        haptics.cardTapped()
+                        selectRecentRoute(route)
+                    }
+                    .contextMenu {
+                        Button(role: .destructive) {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                haptics.cardDeleted()
+                                recentRouteStore.removeRoute(route)
+                            }
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
+                    }
+            }
+        }
+    }
+
     // MARK: - Discover Section
 
     private var discoverSection: some View {
@@ -368,37 +304,6 @@ struct FlightSearchView: View {
 
     // MARK: - Helper Functions
 
-    private func searchFlight() {
-        guard !searchText.isEmpty else { return }
-
-        let searchType = SearchInputParser.shared.parse(searchText)
-        isSearching = true
-
-        switch searchType {
-        case .flightNumber(let flightNumber):
-            haptics.searchSubmitted()
-            searchByFlightNumber(flightNumber)
-            dismissSearch()
-
-        case .route(let origin, let destination):
-            haptics.searchSubmitted()
-            selectedRoute = RouteIdentifier(origin: origin, destination: destination)
-            searchText = ""
-            isSearching = false
-            dismissSearch()
-
-        case .invalid:
-            Task {
-                await MainActor.run {
-                    searchError = "Invalid search. Try a flight number (e.g., AA1) or route (e.g., JFK LHR)"
-                    showErrorAlert = true
-                    isSearching = false
-                    haptics.notificationOccurred(.error)
-                }
-            }
-        }
-    }
-
     private func searchByFlightNumber(_ flightNumber: String, date: Date? = nil) {
         lastSearchedFlightNumber = flightNumber
 
@@ -418,7 +323,6 @@ struct FlightSearchView: View {
                         haptics.notificationOccurred(.success)
                     }
 
-                    searchText = ""
                     isSearching = false
                 }
             } catch let error as AeroAPIError {
@@ -449,6 +353,10 @@ struct FlightSearchView: View {
 
     private func selectRecentSearch(_ search: RecentSearch) {
         selectedFlightNumber = IdentifiableString(value: search.route, faFlightId: nil)
+    }
+
+    private func selectRecentRoute(_ route: RecentRoute) {
+        selectedRoute = RouteIdentifier(origin: route.originCode, destination: route.destinationCode)
     }
 
     private func addToRecentSearches(flightData: RecentFlightData) {
@@ -500,6 +408,16 @@ struct FlightSearchView: View {
         // Fetch fresh data
         updateRecentSearchFromFlightView(flightNumber: flightNumber)
         haptics.impact(.medium)
+    }
+
+    private func saveRecentRoute(origin: String, destination: String) {
+        // Save route with basic codes - airport metadata will be populated if available
+        // The RouteView will have already loaded this data, so we just save what we know
+        let route = RecentRoute(
+            originCode: origin,
+            destinationCode: destination
+        )
+        recentRouteStore.addRoute(route)
     }
 }
 
@@ -732,6 +650,67 @@ private struct SimpleFlightCard: View {
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .short
         return formatter.localizedString(for: search.timestamp, relativeTo: Date())
+    }
+}
+
+// MARK: - Recent Route Card
+
+private struct RecentRouteCard: View {
+    let route: RecentRoute
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            // Route display
+            HStack(alignment: .center, spacing: 12) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(route.originCode)
+                        .font(.sfRounded(size: 28, weight: .bold))
+                    if let city = route.originCity {
+                        Text(city)
+                            .font(.sfRounded(size: 13))
+                            .foregroundColor(.secondary)
+                    }
+                }
+
+                Spacer()
+
+                Image(systemName: "arrow.right")
+                    .font(.system(size: 20, weight: .medium))
+                    .foregroundColor(.blue)
+
+                Spacer()
+
+                VStack(alignment: .trailing, spacing: 4) {
+                    Text(route.destinationCode)
+                        .font(.sfRounded(size: 28, weight: .bold))
+                    if let city = route.destinationCity {
+                        Text(city)
+                            .font(.sfRounded(size: 13))
+                            .foregroundColor(.secondary)
+                    }
+                }
+            }
+
+            // Airport names if available
+            if let originName = route.originName, let destName = route.destinationName {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(originName)
+                        .font(.sfRounded(size: 11))
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                    Text(destName)
+                        .font(.sfRounded(size: 11))
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                }
+            }
+        }
+        .padding(20)
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(Color(.systemBackground))
+                .shadow(color: Color.black.opacity(0.08), radius: 12, x: 0, y: 4)
+        )
     }
 }
 

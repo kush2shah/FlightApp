@@ -42,6 +42,7 @@ enum AmadeusError: LocalizedError {
 }
 
 /// Service for Amadeus API interactions
+@MainActor
 class AmadeusAPIService {
     static let shared = AmadeusAPIService()
 
@@ -74,7 +75,6 @@ class AmadeusAPIService {
 
     private var accessToken: String?
     private var tokenExpiresAt: Date?
-    private let tokenLock = NSLock()
 
     // MARK: - Caching
 
@@ -88,7 +88,6 @@ class AmadeusAPIService {
 
     // MARK: - Rate Limiting
 
-    private let requestQueue = DispatchQueue(label: "com.flightapp.amadeus", qos: .userInitiated)
     private var lastRequestTime: Date?
     private let minRequestInterval: TimeInterval = 0.1 // 10 req/sec max
 
@@ -193,9 +192,6 @@ class AmadeusAPIService {
     // MARK: - Authentication Methods
 
     private func getAccessToken() async throws -> String {
-        tokenLock.lock()
-        defer { tokenLock.unlock() }
-
         // Return cached token if still valid
         if let token = accessToken,
            let expiresAt = tokenExpiresAt,
@@ -239,20 +235,15 @@ class AmadeusAPIService {
     // MARK: - Rate Limiting
 
     private func enforceRateLimit() async throws {
-        try await withCheckedThrowingContinuation { continuation in
-            requestQueue.async {
-                if let lastRequest = self.lastRequestTime {
-                    let elapsed = Date().timeIntervalSince(lastRequest)
-                    if elapsed < self.minRequestInterval {
-                        let delay = self.minRequestInterval - elapsed
-                        Thread.sleep(forTimeInterval: delay)
-                    }
-                }
-
-                self.lastRequestTime = Date()
-                continuation.resume()
+        if let lastRequest = lastRequestTime {
+            let elapsed = Date().timeIntervalSince(lastRequest)
+            if elapsed < minRequestInterval {
+                let delay = minRequestInterval - elapsed
+                try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
             }
         }
+
+        lastRequestTime = Date()
     }
 
     // MARK: - Error Parsing

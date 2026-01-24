@@ -103,12 +103,20 @@ class SearchInputParser {
 
     /// Validate if string looks like a flight number
     private func isValidFlightNumber(_ input: String) -> Bool {
-        // Flight number pattern: 2-3 letter airline code + optional space + 1-4 digit number
-        // Examples: AA1, UA60, BA175, DL1234, AA 1, UA 60
-        let pattern = "^[A-Z]{2,3}\\s?[0-9]{1,4}$"
+        // Flight number pattern: 2-3 alphanumeric airline code + optional space + 1-4 digit number
+        // Examples: AA1, UA60, BA175, DL1234, B6123, F9102, AA 1, UA 60
+        // Airline code must contain at least one letter
+        let pattern = "^[A-Z0-9]{2,3}\\s?[0-9]{1,4}$"
         let regex = try? NSRegularExpression(pattern: pattern)
         let range = NSRange(input.startIndex..., in: input)
-        return regex?.firstMatch(in: input, range: range) != nil
+
+        guard regex?.firstMatch(in: input, range: range) != nil else {
+            return false
+        }
+
+        // Ensure airline code (first 2-3 characters) contains at least one letter
+        let airlineCodePart = input.prefix(3).trimmingCharacters(in: CharacterSet.decimalDigits.union(.whitespaces))
+        return airlineCodePart.contains(where: { $0.isLetter })
     }
 
     /// Convert ICAO to IATA if possible (for seats.aero compatibility)

@@ -7,6 +7,7 @@
 
 import SwiftUI
 import MapKit
+import CoreLocation
 
 struct RouteView: View {
     let origin: String
@@ -24,7 +25,7 @@ struct RouteView: View {
                     .background(.ultraThinMaterial)
                     .ignoresSafeArea()
 
-                ScrollView {
+                ScrollView(.vertical, showsIndicators: false) {
                     VStack(spacing: 0) {
                         if viewModel.isLoading {
                             loadingView
@@ -34,6 +35,7 @@ struct RouteView: View {
                             routeContentView
                         }
                     }
+                    .frame(maxWidth: .infinity)
                 }
             }
             .navigationTitle("\(origin) → \(destination)")
@@ -119,8 +121,9 @@ struct RouteView: View {
                 .frame(height: 400)
             }
 
-            // Show content if we have flights, otherwise show empty state
-            if viewModel.currentFlights.isEmpty && viewModel.awards.isEmpty && !viewModel.isLoading {
+            // Show content if we have flights, awards, or cash offers (or if still loading)
+            // Don't block on cash price loading - show what we have
+            if viewModel.currentFlights.isEmpty && viewModel.awards.isEmpty && viewModel.cashOffers.isEmpty && !viewModel.isLoading && !viewModel.isLoadingCashPrices {
                 emptyRouteState
             } else {
                 VStack(spacing: 32) {
@@ -132,6 +135,24 @@ struct RouteView: View {
                     // Award availability section (only show if we have awards, no "no awards" message)
                     if !viewModel.awards.isEmpty {
                         awardAvailabilitySection
+
+                        // Award insights
+                        InsightCard(
+                            type: .awardAnalysis,
+                            context: buildAwardContext(),
+                            airlineColors: getAirlineColors()
+                        )
+                        .padding(.horizontal, 24)
+                    }
+
+                    // Route context insights (always show when we have route data)
+                    if viewModel.originAirport != nil && viewModel.destinationAirport != nil {
+                        InsightCard(
+                            type: .routeContext,
+                            context: buildRouteContext(),
+                            airlineColors: getAirlineColors()
+                        )
+                        .padding(.horizontal, 24)
                     }
 
                     // Cash prices section (NEW)
@@ -227,97 +248,40 @@ struct RouteView: View {
     }
 
     private var awardAvailabilitySection: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            // Header
+        VStack(alignment: .leading, spacing: 24) {
+            // Simple header
             HStack {
-                Text("Award Availability")
+                Text("Awards")
                     .font(.sfRounded(size: 28, weight: .bold))
                 Spacer()
-                Image(systemName: "star.fill")
-                    .font(.system(size: 20))
-                    .foregroundColor(.yellow)
             }
-            .padding(.horizontal)
+            .padding(.horizontal, 24)
 
-            // Filter Bar
-            AwardFilterBar(filters: $viewModel.awardFilters, availablePrograms: viewModel.availablePrograms)
-                .padding(.horizontal)
-
-            // Results count and recommendations
-            if !viewModel.filteredAwards.isEmpty {
-                HStack {
-                    Text("\(viewModel.filteredAwards.count) \(viewModel.filteredAwards.count == 1 ? "award" : "awards") found")
-                        .font(.sfRounded(size: 14, weight: .medium))
-                        .foregroundColor(.secondary)
-
-                    Spacer()
-
-                    if viewModel.awardFilters.hasActiveFilters {
-                        Button(action: {
-                            HapticManager.shared.impact(.light)
-                            viewModel.awardFilters.reset()
-                        }) {
-                            HStack(spacing: 4) {
-                                Image(systemName: "xmark.circle.fill")
-                                    .font(.system(size: 12))
-                                Text("Clear Filters")
-                                    .font(.sfRounded(size: 13, weight: .medium))
-                            }
-                            .foregroundColor(.blue)
-                        }
+            // Nested dropdowns: Cabin → Program → Dates
+            VStack(spacing: 0) {
+                let cabinsWithAwards = [CabinClass.economy, .premiumEconomy, .business, .first]
+                    .filter { viewModel.hasAwardsForCabin($0) }
+                
+                ForEach(Array(cabinsWithAwards.enumerated()), id: \.element) { index, cabin in
+                    CabinAwardRow(
+                        cabin: cabin,
+                        awards: viewModel.awards,
+                        origin: origin,
+                        destination: destination
+                    )
+                    
+                    // Add divider between cabin sections (but not after the last one)
+                    if index < cabinsWithAwards.count - 1 {
+                        Divider()
                     }
                 }
-                .padding(.horizontal)
-
-                // Award cards
-                VStack(spacing: 14) {
-                    ForEach(Array(viewModel.filteredAwards.prefix(20).enumerated()), id: \.element.id) { index, award in
-                        AwardRowCard(
-                            award: award,
-                            isRecommended: viewModel.recommendedAwards.contains(where: { $0.id == award.id }),
-                            origin: origin,
-                            destination: destination
-                        )
-                    }
-                }
-                .padding(.horizontal)
-
-                if viewModel.filteredAwards.count > 20 {
-                    Text("Showing first 20 results")
-                        .font(.sfRounded(size: 13))
-                        .foregroundColor(.secondary)
-                        .frame(maxWidth: .infinity, alignment: .center)
-                }
-            } else if !viewModel.awards.isEmpty {
-                // No results after filtering
-                VStack(spacing: 24) {
-                    // Empty Filter Icon
-                    Circle()
-                        .fill(Color.blue.opacity(0.1))
-                        .frame(width: 64, height: 64)
-                        .overlay(
-                            Image(systemName: "line.3.horizontal.decrease.circle")
-                                .font(.system(size: 28))
-                                .foregroundColor(.blue)
-                        )
-
-                    VStack(spacing: 8) {
-                        Text("No awards match your filters")
-                            .font(.sfRounded(size: 18, weight: .semibold))
-                            .foregroundColor(.primary)
-
-                        Button("Clear Filters") {
-                            HapticManager.shared.impact(.light)
-                            viewModel.awardFilters.reset()
-                        }
-                        .font(.sfRounded(size: 14, weight: .medium))
-                        .foregroundColor(.blue)
-                        .padding(.top, 4)
-                    }
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 40)
             }
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(.clear)
+                    .glassEffect(.regular, in: .rect(cornerRadius: 16))
+            )
+            .padding(.horizontal, 24)
         }
     }
 
@@ -326,79 +290,131 @@ struct RouteView: View {
     @ViewBuilder
     private var cashPricesSection: some View {
         if FeatureFlags.shared.canUseAmadeus {
-            VStack(alignment: .leading, spacing: 20) {
-                // Header
+            VStack(alignment: .leading, spacing: 24) {
+                // Simple header
                 HStack {
-                    Text("Cash Prices")
+                    Text("Cash Fares")
                         .font(.sfRounded(size: 28, weight: .bold))
                     Spacer()
-                    Image(systemName: "dollarsign.circle.fill")
-                        .font(.system(size: 20))
-                        .foregroundColor(.green)
                 }
-                .padding(.horizontal)
+                .padding(.horizontal, 24)
 
-                VStack(spacing: 14) {
-                    if viewModel.isLoadingCashPrices {
-                        // Loading state
-                        HStack {
-                            Spacer()
-                            VStack(spacing: 12) {
-                                ProgressView()
-                                Text("Loading cash prices...")
-                                    .font(.sfRounded(size: 13))
-                                    .foregroundColor(.secondary)
-                            }
-                            Spacer()
-                        }
-                        .padding(.vertical, 32)
-                    } else if !viewModel.cashOffers.isEmpty {
-                        // Show cash price cards
-                        ForEach(Array(viewModel.cashOffers.prefix(10).enumerated()), id: \.offset) { index, offer in
-                            CashPriceCard(offer: offer)
-                        }
-                        .padding(.horizontal)
+                // Content based on load state
+                if viewModel.isLoadingCashPrices {
+                    // Loading with progress bar
+                    VStack(spacing: 16) {
+                        // Animated airplane icon
+                        Image(systemName: "airplane")
+                            .font(.system(size: 32))
+                            .foregroundColor(.blue)
+                            .symbolEffect(.pulse, options: .repeating)
 
-                        if viewModel.cashOffers.count > 10 {
-                            Text("Showing first 10 cash prices")
-                                .font(.sfRounded(size: 13))
-                                .foregroundColor(.secondary)
-                                .frame(maxWidth: .infinity, alignment: .center)
-                        }
-                    } else if viewModel.cashPriceError != nil {
-                        // Error state
-                        VStack(spacing: 12) {
-                            Image(systemName: "exclamationmark.triangle")
-                                .font(.system(size: 48))
-                                .foregroundColor(.orange)
-                            Text("Cash prices unavailable")
-                                .font(.sfRounded(size: 16, weight: .semibold))
-                            Text("Unable to load prices at this time")
-                                .font(.sfRounded(size: 13))
-                                .foregroundColor(.secondary)
-                                .multilineTextAlignment(.center)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 40)
-                    } else if !viewModel.isLoading {
-                        // No results
-                        VStack(spacing: 12) {
-                            Image(systemName: "airplane.departure")
-                                .font(.system(size: 48))
-                                .foregroundColor(.secondary)
-                            Text("No cash prices found")
-                                .font(.sfRounded(size: 16, weight: .semibold))
-                            Text("Try different dates or check back later")
-                                .font(.sfRounded(size: 13))
-                                .foregroundColor(.secondary)
-                                .multilineTextAlignment(.center)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 40)
+                        Text("Loading fares in cash...")
+                            .font(.sfRounded(size: 15))
+                            .foregroundColor(.secondary)
+
+                        // Progress bar showing search progress
+                        ProgressView(value: viewModel.cashPriceLoadingProgress, total: Double(viewModel.cashPriceLoadingTotal))
+                            .tint(.blue)
+                            .frame(maxWidth: 200)
                     }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 40)
+                    .background(
+                        RoundedRectangle(cornerRadius: 16)
+                            .fill(.clear)
+                            .glassEffect(.regular, in: .rect(cornerRadius: 16))
+                    )
+                    .padding(.horizontal, 24)
+                    .transition(.opacity.combined(with: .scale(scale: 0.95)))
+
+                } else if !viewModel.cashOffers.isEmpty {
+                    // BLUF - Show best price only
+                    if let bestOffer = viewModel.cashOffers.first {
+                        BestCashPriceRow(offer: bestOffer)
+                            .padding(.horizontal, 24)
+                            .transition(.opacity.combined(with: .move(edge: .top)))
+                    }
+
+                } else if viewModel.cashPriceError != nil {
+                    // Error state
+                    Text("Prices unavailable")
+                        .font(.sfRounded(size: 15))
+                        .foregroundColor(.secondary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 24)
+                        .padding(.horizontal, 24)
                 }
             }
+            .animation(.spring(response: 0.4, dampingFraction: 0.8), value: viewModel.isLoadingCashPrices)
         }
+    }
+
+    // MARK: - Insight Context Builders
+
+    private func getAirlineColors() -> AirlineBrandColors? {
+        // Try to get airline from first current flight
+        let airlineCode = viewModel.currentFlights.first?.operatorIata
+        guard let code = airlineCode else { return nil }
+        return AirlineColorService.shared.getBrandColors(for: code)
+    }
+
+    private func buildAwardContext() -> InsightContext {
+        // Build list of unique award offers across all cabins
+        var awardOffers: [AwardOffer] = []
+
+        for award in viewModel.awards {
+            let source = award.source
+
+            // Check each cabin class
+            if award.jAvailable == true, let milesStr = award.jMileageCost, let miles = Int(milesStr) {
+                awardOffers.append(AwardOffer(program: source, miles: miles, cabin: "Business"))
+            }
+            if award.fAvailable == true, let milesStr = award.fMileageCost, let miles = Int(milesStr) {
+                awardOffers.append(AwardOffer(program: source, miles: miles, cabin: "First"))
+            }
+            if award.yAvailable == true, let milesStr = award.yMileageCost, let miles = Int(milesStr) {
+                awardOffers.append(AwardOffer(program: source, miles: miles, cabin: "Economy"))
+            }
+            if award.wAvailable == true, let milesStr = award.wMileageCost, let miles = Int(milesStr) {
+                awardOffers.append(AwardOffer(program: source, miles: miles, cabin: "Premium Economy"))
+            }
+        }
+
+        return InsightContext(
+            awardData: awardOffers.isEmpty ? nil : awardOffers,
+            origin: origin,
+            destination: destination
+        )
+    }
+
+    private func buildRouteContext() -> InsightContext {
+        // Calculate route distance if we have coordinates
+        var distance: Double?
+        if let orig = viewModel.originAirport,
+           let dest = viewModel.destinationAirport,
+           let origLat = orig.latitude,
+           let origLon = orig.longitude,
+           let destLat = dest.latitude,
+           let destLon = dest.longitude {
+            let location1 = CLLocation(latitude: origLat, longitude: origLon)
+            let location2 = CLLocation(latitude: destLat, longitude: destLon)
+            let distanceMeters = location1.distance(from: location2)
+            distance = distanceMeters / 1609.34 // Convert meters to miles
+        }
+
+        // Duration - we can't easily parse the string times, so skip for now
+        // Claude can still provide insights without duration
+        let duration: TimeInterval? = nil
+
+        return InsightContext(
+            origin: origin,
+            destination: destination,
+            distance: distance,
+            duration: duration,
+            destinationAirport: destination,
+            destinationCity: viewModel.destinationAirport?.city
+        )
     }
 }
 
@@ -1131,7 +1147,616 @@ struct AwardRowCard: View {
     }
 
     private func formatProgram(_ source: String) -> String {
-        source.capitalized.replacingOccurrences(of: "_", with: " ")
+        MileageProgramService.shared.getProgramName(from: source)
+    }
+}
+
+// MARK: - BLUF Components
+
+struct BestAwardRow: View {
+    let cabin: CabinClass
+    let award: AwardAvailability
+    let origin: String
+    let destination: String
+    let allAwards: [AwardAvailability]
+
+    @State private var showingCabinFlights = false
+
+    // Get all awards for this cabin
+    private var cabinAwards: [AwardAvailability] {
+        allAwards.filter { $0.isCabinAvailable(cabin) }
+            .sorted { award1, award2 in
+                guard let cost1String = award1.getMileageCost(for: cabin),
+                      let cost2String = award2.getMileageCost(for: cabin) else {
+                    return false
+                }
+                let cost1 = Int(cost1String.replacingOccurrences(of: ",", with: "")) ?? Int.max
+                let cost2 = Int(cost2String.replacingOccurrences(of: ",", with: "")) ?? Int.max
+                return cost1 < cost2
+            }
+    }
+
+    var body: some View {
+        Button(action: {
+            HapticManager.shared.impact(.medium)
+            showingCabinFlights = true
+        }) {
+            HStack(spacing: 16) {
+                // Cabin icon
+                Image(systemName: cabin.icon)
+                    .font(.system(size: 24))
+                    .foregroundColor(.blue)
+                    .frame(width: 40)
+
+                // Cabin name
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(cabin.displayName)
+                        .font(.sfRounded(size: 16, weight: .semibold))
+                        .foregroundColor(.primary)
+                    if let seats = award.getRemainingSeats(for: cabin) {
+                        Text("\(seats) left")
+                            .font(.sfRounded(size: 13))
+                            .foregroundColor(.secondary)
+                    }
+                }
+
+                Spacer()
+
+                // Points cost
+                if let cost = award.getMileageCost(for: cabin) {
+                    HStack(spacing: 4) {
+                        Text(cost)
+                            .font(.sfRounded(size: 20, weight: .bold))
+                            .foregroundColor(.blue)
+                        Text("pts")
+                            .font(.sfRounded(size: 13, weight: .medium))
+                            .foregroundColor(.secondary)
+                    }
+                }
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(.secondary.opacity(0.5))
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 16)
+        }
+        .buttonStyle(PlainButtonStyle())
+        .sheet(isPresented: $showingCabinFlights) {
+            CabinAwardsSheet(cabin: cabin, awards: cabinAwards, origin: origin, destination: destination)
+        }
+    }
+}
+
+// Sheet showing all awards for a specific cabin class
+struct CabinAwardsSheet: View {
+    let cabin: CabinClass
+    let awards: [AwardAvailability]
+    let origin: String
+    let destination: String
+    @Environment(\.dismiss) private var dismiss
+    
+    // Group awards by mileage program
+    private var groupedAwards: [(program: String, awards: [AwardAvailability])] {
+        let programGroups = Dictionary(grouping: awards) { award in
+            MileageProgramService.shared.getProgramName(from: award.source)
+        }
+        return programGroups
+            .sorted { $0.key < $1.key }
+            .map { (program: $0.key, awards: $0.value.sorted { award1, award2 in
+                // Sort by date within each program
+                award1.date < award2.date
+            })}
+    }
+
+    var body: some View {
+        NavigationView {
+            ScrollView {
+                VStack(spacing: 24) {
+                    ForEach(groupedAwards, id: \.program) { group in
+                        VStack(alignment: .leading, spacing: 12) {
+                            // Program header
+                            HStack {
+                                Text(group.program)
+                                    .font(.sfRounded(size: 20, weight: .bold))
+                                    .foregroundColor(.primary)
+                                Spacer()
+                                Text("\(group.awards.count)")
+                                    .font(.sfRounded(size: 14, weight: .semibold))
+                                    .foregroundColor(.secondary)
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 4)
+                                    .background(Color.secondary.opacity(0.1))
+                                    .cornerRadius(8)
+                            }
+                            .padding(.horizontal, 4)
+                            
+                            // Awards for this program
+                            VStack(spacing: 12) {
+                                ForEach(group.awards) { award in
+                                    AwardRowCard(award: award, isRecommended: false, origin: origin, destination: destination)
+                                }
+                            }
+                        }
+                    }
+                }
+                .padding(24)
+            }
+            .background(Color(.systemGroupedBackground))
+            .navigationTitle("\(cabin.displayName) Awards")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Program Award Group (for Awards section)
+
+/// Groups awards by mileage program and shows best fare with expandable list
+/// Cabin-level row that expands to show programs
+struct CabinAwardRow: View {
+    let cabin: CabinClass
+    let awards: [AwardAvailability]
+    let origin: String
+    let destination: String
+    
+    @State private var isExpanded = false
+    
+    // Group awards by program
+    // Group awards by program
+    private var programGroups: [(program: String, awards: [AwardAvailability])] {
+        let groups = Dictionary(grouping: awards.filter { $0.isCabinAvailable(cabin) }) { award in
+            award.programName
+        }
+        return groups
+            .map { (program: $0.key, awards: $0.value.sorted { $0.date < $1.date }) }
+            .sorted { group1, group2 in
+                // Sort program groups by their best (lowest) award price
+                let bestCost1 = group1.awards
+                    .compactMap { award -> Int? in
+                        guard let costString = award.getMileageCost(for: cabin) else { return nil }
+                        return Int(costString.replacingOccurrences(of: ",", with: ""))
+                    }
+                    .min() ?? Int.max
+                
+                let bestCost2 = group2.awards
+                    .compactMap { award -> Int? in
+                        guard let costString = award.getMileageCost(for: cabin) else { return nil }
+                        return Int(costString.replacingOccurrences(of: ",", with: ""))
+                    }
+                    .min() ?? Int.max
+                
+                return bestCost1 < bestCost2
+            }
+    }
+    
+    // Best (lowest cost) award across all programs for this cabin
+    private var bestAward: AwardAvailability? {
+        awards
+            .filter { $0.isCabinAvailable(cabin) }
+            .min { award1, award2 in
+                guard let cost1String = award1.getMileageCost(for: cabin),
+                      let cost2String = award2.getMileageCost(for: cabin) else {
+                    return false
+                }
+                let cost1 = Int(cost1String.replacingOccurrences(of: ",", with: "")) ?? Int.max
+                let cost2 = Int(cost2String.replacingOccurrences(of: ",", with: "")) ?? Int.max
+                return cost1 < cost2
+            }
+    }
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            // Main cabin row (always visible)
+            Button(action: {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                    isExpanded.toggle()
+                }
+                HapticManager.shared.impact(.light)
+            }) {
+                HStack(spacing: 16) {
+                    // Cabin icon
+                    Image(systemName: cabin.icon)
+                        .font(.system(size: 24))
+                        .foregroundColor(.blue)
+                        .frame(width: 40)
+                    
+                    // Cabin name and program count
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(cabin.displayName)
+                            .font(.sfRounded(size: 16, weight: .semibold))
+                            .foregroundColor(.primary)
+                            .lineLimit(1)
+                        Text("\(programGroups.count) program\(programGroups.count == 1 ? "" : "s")")
+                            .font(.sfRounded(size: 13))
+                            .foregroundColor(.secondary)
+                            .lineLimit(1)
+                    }
+                    
+                    Spacer(minLength: 8)
+                    
+                    // Best points cost
+                    if let best = bestAward, let cost = best.getMileageCost(for: cabin) {
+                        HStack(spacing: 4) {
+                            Text("from")
+                                .font(.sfRounded(size: 11))
+                                .foregroundColor(.secondary)
+                            Text(cost)
+                                .font(.sfRounded(size: 20, weight: .bold))
+                                .foregroundColor(.blue)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.7)
+                            Text("pts")
+                                .font(.sfRounded(size: 13, weight: .medium))
+                                .foregroundColor(.secondary)
+                        }
+                        .fixedSize(horizontal: true, vertical: false)
+                    }
+                    
+                    // Expand indicator
+                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(.secondary.opacity(0.5))
+                        .rotationEffect(.degrees(isExpanded ? 180 : 0))
+                        .frame(width: 14)
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 16)
+            }
+            .buttonStyle(PlainButtonStyle())
+            
+            // Expanded programs list
+            if isExpanded {
+                VStack(spacing: 0) {
+                    Divider()
+                        .padding(.leading, 76)
+                    
+                    ForEach(Array(programGroups.enumerated()), id: \.element.program) { index, group in
+                        ProgramAwardGroup(
+                            programName: group.program,
+                            awards: group.awards,
+                            cabin: cabin,
+                            origin: origin,
+                            destination: destination
+                        )
+                        
+                        if index < programGroups.count - 1 {
+                            Divider()
+                                .padding(.leading, 76)
+                        }
+                    }
+                }
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+    }
+}
+
+/// Program-level row within a cabin that expands to show dates
+struct ProgramAwardGroup: View {
+    let programName: String
+    let awards: [AwardAvailability]
+    let cabin: CabinClass
+    let origin: String
+    let destination: String
+
+    @State private var isExpanded = false
+
+    // Get airline logo image name from the source code
+    private var airlineImageName: String? {
+        guard let firstAward = awards.first else { return nil }
+        return MileageProgramService.shared.getImageName(from: firstAward.source)
+    }
+
+    // Get the best (lowest cost) award for this program and cabin
+    private var bestAward: AwardAvailability? {
+        awards
+            .filter { $0.isCabinAvailable(cabin) }
+            .min { award1, award2 in
+                guard let cost1String = award1.getMileageCost(for: cabin),
+                      let cost2String = award2.getMileageCost(for: cabin) else {
+                    return false
+                }
+                let cost1 = Int(cost1String.replacingOccurrences(of: ",", with: "")) ?? Int.max
+                let cost2 = Int(cost2String.replacingOccurrences(of: ",", with: "")) ?? Int.max
+                return cost1 < cost2
+            }
+    }
+    
+    // Get all other awards (for pagination)
+    // Get all other awards (for pagination)
+    private var additionalAwards: [AwardAvailability] {
+        guard let best = bestAward else { return [] }
+        return awards
+            .filter { $0.isCabinAvailable(cabin) && $0.id != best.id }
+            .sorted { award1, award2 in
+                // Sort by mileage cost (ascending - cheapest first)
+                guard let cost1String = award1.getMileageCost(for: cabin),
+                      let cost2String = award2.getMileageCost(for: cabin) else {
+                    return false
+                }
+                let cost1 = Int(cost1String.replacingOccurrences(of: ",", with: "")) ?? Int.max
+                let cost2 = Int(cost2String.replacingOccurrences(of: ",", with: "")) ?? Int.max
+                
+                // Primary sort: by cost
+                if cost1 != cost2 {
+                    return cost1 < cost2
+                }
+                
+                // Secondary sort: by date (earlier dates first)
+                return award1.date < award2.date
+            }
+    }
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            // Best fare row (always visible)
+            if let best = bestAward {
+                Button(action: {
+                    if !additionalAwards.isEmpty {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            isExpanded.toggle()
+                        }
+                        HapticManager.shared.impact(.light)
+                    }
+                }) {
+                    HStack(spacing: 12) {
+                        // Indent spacer
+                        Rectangle()
+                            .fill(Color.clear)
+                            .frame(width: 40)
+                        
+                        // Program logo using AirlineLogoView
+                        AirlineLogoView(iataCode: airlineImageName, size: 36)
+                            .frame(width: 36, height: 36)
+                        
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack(spacing: 6) {
+                                Text(programName)
+                                    .font(.sfRounded(size: 15, weight: .semibold))
+                                    .foregroundColor(.primary)
+                                    .lineLimit(1)
+                                
+                                if !additionalAwards.isEmpty {
+                                    Text("+\(additionalAwards.count)")
+                                        .font(.sfRounded(size: 11, weight: .medium))
+                                        .foregroundColor(.blue)
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 2)
+                                        .background(Color.blue.opacity(0.1))
+                                        .cornerRadius(6)
+                                }
+                            }
+                            
+                            // Date info
+                            if let parsedDate = best.parsedDate {
+                                Text(formatDate(parsedDate))
+                                    .font(.sfRounded(size: 12))
+                                    .foregroundColor(.secondary)
+                                    .lineLimit(1)
+                            }
+                        }
+                        
+                        Spacer(minLength: 8)
+                        
+                        // Points cost
+                        if let cost = best.getMileageCost(for: cabin) {
+                            HStack(spacing: 4) {
+                                Text(cost)
+                                    .font(.sfRounded(size: 16, weight: .bold))
+                                    .foregroundColor(.blue)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.8)
+                                Text("pts")
+                                    .font(.sfRounded(size: 11, weight: .medium))
+                                    .foregroundColor(.secondary)
+                            }
+                            .fixedSize(horizontal: true, vertical: false)
+                        }
+                        
+                        // Expand indicator (only if there are more dates)
+                        if !additionalAwards.isEmpty {
+                            Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundColor(.secondary.opacity(0.5))
+                                .rotationEffect(.degrees(isExpanded ? 180 : 0))
+                                .frame(width: 12)
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 12)
+                    .background(Color.blue.opacity(0.02))
+                }
+                .buttonStyle(PlainButtonStyle())
+            }
+            
+            // Expanded additional fares
+            if isExpanded && !additionalAwards.isEmpty {
+                VStack(spacing: 0) {
+                    ForEach(additionalAwards.prefix(5)) { award in
+                        VStack(spacing: 0) {
+                            HStack(spacing: 12) {
+                                // Double indent
+                                Rectangle()
+                                    .fill(Color.clear)
+                                    .frame(width: 88)
+                                
+                                VStack(alignment: .leading, spacing: 4) {
+                                    if let parsedDate = award.parsedDate {
+                                        Text(formatDate(parsedDate))
+                                            .font(.sfRounded(size: 13, weight: .medium))
+                                            .foregroundColor(.primary)
+                                            .lineLimit(1)
+                                    }
+                                    
+                                    if let seats = award.getRemainingSeats(for: cabin) {
+                                        Text("\(seats) seat\(seats == 1 ? "" : "s") left")
+                                            .font(.sfRounded(size: 11))
+                                            .foregroundColor(.secondary)
+                                            .lineLimit(1)
+                                    }
+                                }
+                                
+                                Spacer(minLength: 8)
+                                
+                                if let cost = award.getMileageCost(for: cabin) {
+                                    HStack(spacing: 4) {
+                                        Text(cost)
+                                            .font(.sfRounded(size: 14, weight: .bold))
+                                            .foregroundColor(.blue)
+                                            .lineLimit(1)
+                                            .minimumScaleFactor(0.8)
+                                        Text("pts")
+                                            .font(.sfRounded(size: 10, weight: .medium))
+                                            .foregroundColor(.secondary)
+                                    }
+                                    .fixedSize(horizontal: true, vertical: false)
+                                }
+                            }
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 10)
+                            .background(Color.blue.opacity(0.01))
+                            
+                            if award.id != additionalAwards.prefix(5).last?.id {
+                                Divider()
+                                    .padding(.leading, 88)
+                            }
+                        }
+                    }
+                    
+                    // Show more indicator if there are more than 5 additional awards
+                    if additionalAwards.count > 5 {
+                        HStack {
+                            Text("+\(additionalAwards.count - 5) more dates available")
+                                .font(.sfRounded(size: 11))
+                                .foregroundColor(.secondary)
+                                .lineLimit(1)
+                            Spacer()
+                        }
+                        .padding(.horizontal, 88)
+                        .padding(.vertical, 8)
+                        .background(Color.secondary.opacity(0.03))
+                    }
+                }
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+    }
+    
+    private func formatDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMM d, yyyy"
+        return formatter.string(from: date)
+    }
+}
+
+struct BestCashPriceRow: View {
+    let offer: FlightOffer
+
+    private var airlineCode: String? {
+        offer.outbound?.segments.first?.carrierCode
+    }
+
+    private var displayName: String {
+        guard let firstSegment = offer.outbound?.segments.first else {
+            return "Flight"
+        }
+
+        let airlineName = firstSegment.airlineName
+
+        // If airline name lookup failed and returned just the code,
+        // show the flight number instead for better UX
+        if airlineName == firstSegment.carrierCode {
+            return "Flight \(firstSegment.flightNumber)"
+        }
+
+        return airlineName
+    }
+
+    var body: some View {
+        HStack(spacing: 16) {
+            // Airline logo
+            if let code = airlineCode {
+                AirlineLogoView(iataCode: code, size: 56)
+                    .frame(width: 56, height: 56)
+            } else {
+                Image(systemName: "airplane.circle.fill")
+                    .font(.system(size: 56))
+                    .foregroundColor(.blue)
+                    .frame(width: 56, height: 56)
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                // Airline name or flight number
+                Text(displayName)
+                    .font(.sfRounded(size: 17, weight: .semibold))
+                    .foregroundColor(.primary)
+                    .lineLimit(1)
+
+                // Date
+                if let departure = offer.outbound?.segments.first?.departure {
+                    Text(departure.formattedDate)
+                        .font(.sfRounded(size: 14))
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                }
+
+                // Flight details
+                HStack(spacing: 6) {
+                    if offer.numberOfStops == 0 {
+                        Text("Nonstop")
+                            .font(.sfRounded(size: 13))
+                            .foregroundColor(.green)
+                    } else {
+                        Text("\(offer.numberOfStops) \(offer.numberOfStops == 1 ? "stop" : "stops")")
+                            .font(.sfRounded(size: 13))
+                            .foregroundColor(.secondary)
+                    }
+                    if let duration = offer.outbound?.duration {
+                        Text("•")
+                            .foregroundColor(.secondary.opacity(0.5))
+                        Text(formatDuration(duration))
+                            .font(.sfRounded(size: 13))
+                            .foregroundColor(.secondary)
+                    }
+                }
+                .lineLimit(1)
+            }
+
+            Spacer(minLength: 8)
+
+            // Price - emphasized but not overwhelming
+            VStack(alignment: .trailing, spacing: 2) {
+                Text("$\(Int(offer.totalPrice))")
+                    .font(.sfRounded(size: 32, weight: .bold))
+                    .foregroundColor(.green)
+                    .lineLimit(1)
+                Text("USD")
+                    .font(.sfRounded(size: 12, weight: .medium))
+                    .foregroundColor(.secondary)
+            }
+            .fixedSize(horizontal: true, vertical: false)
+        }
+        .padding(20)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(.clear)
+                .glassEffect(.regular, in: .rect(cornerRadius: 16))
+        )
+    }
+
+    private func formatDuration(_ duration: String) -> String {
+        // Parse "PT7H30M" to "7h 30m"
+        var result = duration.replacingOccurrences(of: "PT", with: "")
+        result = result.replacingOccurrences(of: "H", with: "h ")
+        result = result.replacingOccurrences(of: "M", with: "m")
+        return result
     }
 }
 

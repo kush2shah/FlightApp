@@ -43,6 +43,18 @@ struct FlightOffer: Codable, Identifiable {
         validatingAirlineCodes.first ?? outbound?.segments.first?.carrierCode
     }
 
+    /// Friendly airline name from primary airline code
+    var primaryAirlineName: String {
+        guard let code = primaryAirline else { return "" }
+        return AirlineNameService.shared.getAirlineName(from: code)
+    }
+
+    /// Airline booking website URL (no API call - local lookup only)
+    var airlineWebsiteUrl: URL? {
+        guard let airline = primaryAirline else { return nil }
+        return AwardBookingService.shared.getAirlineWebsite(airlineIATA: airline)
+    }
+
     /// Number of stops
     var numberOfStops: Int {
         max(0, (outbound?.segments.count ?? 1) - 1)
@@ -103,6 +115,11 @@ struct FlightSegment: Codable, Identifiable {
 
     var flightNumber: String {
         "\(carrierCode)\(number)"
+    }
+
+    /// Friendly airline name from carrier code
+    var airlineName: String {
+        AirlineNameService.shared.getAirlineName(from: carrierCode)
     }
 
     var formattedDuration: String {

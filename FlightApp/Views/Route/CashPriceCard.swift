@@ -12,29 +12,39 @@ struct CashPriceCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            // Header: Date and airline
+            // Header: Price most prominent, airline and date below
             HStack(spacing: 16) {
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: 8) {
+                    // Price - most prominent
+                    Text(offer.formattedTotalPrice)
+                        .font(.sfRounded(size: 24, weight: .bold))
+                        .foregroundColor(.green)
+                    
+                    // Airline name
+                    Text(offer.primaryAirlineName)
+                        .font(.sfRounded(size: 15, weight: .semibold))
+                        .foregroundColor(.primary)
+                    
                     if let segment = offer.outbound?.segments.first {
+                        // Date and flight info
                         HStack(spacing: 8) {
                             Image(systemName: "calendar")
-                                .font(.system(size: 16))
-                                .foregroundColor(.green)
+                                .font(.system(size: 13))
+                                .foregroundColor(.secondary)
                             Text(segment.departure.formattedFullDate)
-                                .font(.sfRounded(size: 16, weight: .semibold))
-                                .foregroundColor(.primary)
+                                .font(.sfRounded(size: 13, weight: .medium))
+                                .foregroundColor(.secondary)
                         }
 
-                        // Flight info
                         HStack(spacing: 4) {
-                            Text("\(segment.carrierCode) \(segment.number)")
-                                .font(.sfRounded(size: 13))
+                            Text("\(segment.carrierCode)\(segment.number)")
+                                .font(.sfRounded(size: 12))
                                 .foregroundColor(.secondary)
                             Text("•")
                                 .foregroundColor(.secondary)
                                 .font(.caption)
                             Text("\(segment.departure.formattedTime) → \(segment.arrival.formattedTime)")
-                                .font(.sfRounded(size: 13))
+                                .font(.sfRounded(size: 12))
                                 .foregroundColor(.secondary)
                         }
                     }
@@ -42,23 +52,22 @@ struct CashPriceCard: View {
 
                 Spacer()
 
-                // Book button
-                BookButton {
-                    HapticManager.shared.impact(.light)
-                    // In the future, this could open a booking URL
+                // Book button - opens airline website
+                if let url = offer.airlineWebsiteUrl {
+                    Link(destination: url) {
+                        BookButton {
+                            HapticManager.shared.impact(.light)
+                        }
+                    }
+                } else {
+                    BookButton {
+                        HapticManager.shared.impact(.light)
+                    }
                 }
             }
 
-            // Price and cabin details
-            HStack {
-                HStack(spacing: 4) {
-                    Text(offer.formattedTotalPrice)
-                        .font(.sfRounded(size: 18, weight: .bold))
-                        .foregroundColor(.green)
-                }
-
-                Spacer()
-
+            // Cabin and stop details
+            HStack(spacing: 12) {
                 HStack(spacing: 6) {
                     Text(offer.primaryCabinDisplay)
                         .font(.sfRounded(size: 13, weight: .medium))
@@ -67,26 +76,24 @@ struct CashPriceCard: View {
                         .font(.sfRounded(size: 12))
                         .foregroundColor(.secondary)
                 }
-            }
 
-            // Flight details
-            if let itinerary = offer.outbound {
-                HStack(spacing: 12) {
-                    HStack(spacing: 4) {
+                Spacer()
+
+                // Flight details
+                if let itinerary = offer.outbound {
+                    HStack(spacing: 8) {
                         Image(systemName: "clock")
                             .font(.caption2)
                             .foregroundColor(.secondary)
                         Text(itinerary.formattedDuration)
                             .font(.sfRounded(size: 12))
                             .foregroundColor(.secondary)
-                    }
 
-                    if let segment = itinerary.segments.first {
-                        Text("•")
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
+                        if let segment = itinerary.segments.first {
+                            Text("•")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
 
-                        HStack(spacing: 4) {
                             Text("\(segment.departure.iataCode) → \(segment.arrival.iataCode)")
                                 .font(.sfRounded(size: 12))
                                 .foregroundColor(.secondary)

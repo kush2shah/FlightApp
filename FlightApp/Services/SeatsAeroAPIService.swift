@@ -191,6 +191,11 @@ struct AwardAvailability: Codable, Identifiable {
     let date: String
     let source: String
 
+    /// Friendly mileage program name derived from source
+    var programName: String {
+        MileageProgramService.shared.getProgramName(from: source)
+    }
+
     // Economy availability
     let yAvailable: Bool?
     let yMileageCost: String?
@@ -283,16 +288,18 @@ struct AwardAvailability: Codable, Identifiable {
 
     /// Get mileage cost for specific cabin
     func getMileageCost(for cabin: CabinClass) -> String? {
+        let rawCost: String?
         switch cabin {
         case .first:
-            return fMileageCost
+            rawCost = fMileageCost
         case .business:
-            return jMileageCost
+            rawCost = jMileageCost
         case .premiumEconomy:
-            return wMileageCost
+            rawCost = wMileageCost
         case .economy:
-            return yMileageCost
+            rawCost = yMileageCost
         }
+        return rawCost?.formattedMileageCost()
     }
 
     /// Get remaining seats for specific cabin
