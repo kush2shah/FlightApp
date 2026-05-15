@@ -46,12 +46,14 @@ struct FlightSearchView: View {
                         // Recent flights section
                         if !recentSearchStore.recentSearches.isEmpty {
                             recentFlightsSection
+                                .padding(.horizontal, 20)
                                 .padding(.bottom, 32)
                         }
 
                         // Recent routes section
                         if !recentRouteStore.recentRoutes.isEmpty {
                             recentRoutesSection
+                                .padding(.horizontal, 20)
                                 .padding(.bottom, 32)
                         }
 
@@ -59,7 +61,7 @@ struct FlightSearchView: View {
                         discoverSection
                             .padding(.bottom, 100) // Space for bottom search bar
                     }
-                    .padding(.horizontal, 20)
+                    .frame(maxWidth: .infinity)
                 }
 
                 // Unified search bar (liquid glass)
@@ -299,7 +301,6 @@ struct FlightSearchView: View {
                 .padding(.horizontal, 20)
             }
         }
-        .padding(.horizontal, -20) // Counteract parent padding
     }
 
     // MARK: - Helper Functions
