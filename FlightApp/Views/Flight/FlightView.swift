@@ -37,76 +37,80 @@ struct FlightView: View {
                 .background(.ultraThinMaterial)
                 .ignoresSafeArea()
 
-            ScrollView {
-                VStack(spacing: 0) {
-                    if let flight = viewModel.currentFlight {
-                    // Hero section with flight number and route
-                    FlightHeroSection(flight: flight)
-                        .padding(.horizontal)
-                        .padding(.top)
+            GeometryReader { geometry in
+                ScrollView(.vertical) {
+                    VStack(spacing: 0) {
+                        if let flight = viewModel.currentFlight {
+                            // Hero section with flight number and route
+                            FlightHeroSection(flight: flight)
+                                .padding(.horizontal)
+                                .padding(.top)
 
-                    // Route map - full width, no padding
-                    FlightRouteMapView(flight: flight)
-                        .padding(.top, 20)
+                            // Route map - full width, no padding
+                            FlightRouteMapView(flight: flight)
+                                .padding(.top, 20)
 
-                        VStack(spacing: 20) {
-                            // Time and progress information
-                            let flightTimes = viewModel.getFlightTimes()
-                            FlightRouteCard(
-                                flight: flight,
-                                times: flightTimes
-                            )
+                            VStack(spacing: 20) {
+                                // Time and progress information
+                                let flightTimes = viewModel.getFlightTimes()
+                                FlightRouteCard(
+                                    flight: flight,
+                                    times: flightTimes
+                                )
 
-                            // Gate and terminal information
-                            FlightGateTerminalCard(flight: flight)
+                                // Gate and terminal information
+                                FlightGateTerminalCard(flight: flight)
 
-                            // Aircraft and route details
-                            FlightAircraftCard(flight: flight)
+                                // Aircraft and route details
+                                FlightAircraftCard(flight: flight)
 
-                            // Aircraft insights
-                            if let aircraftType = flight.aircraftType {
+                                // Aircraft insights
+                                if let aircraftType = flight.aircraftType {
+                                    InsightCard(
+                                        type: .aircraft,
+                                        context: InsightContext(
+                                            flightNumber: flight.ident,
+                                            airline: flight.operatorName,
+                                            aircraftType: aircraftType
+                                        ),
+                                        airlineColors: AirlineColorService.shared.getBrandColors(for: flight.operatorIata)
+                                    )
+                                }
+
+                                // Destination insights
                                 InsightCard(
-                                    type: .aircraft,
+                                    type: .destination,
                                     context: InsightContext(
-                                        flightNumber: flight.ident,
-                                        airline: flight.operatorName,
-                                        aircraftType: aircraftType
+                                        destinationAirport: flight.destination.code,
+                                        destinationCity: flight.destination.city
                                     ),
                                     airlineColors: AirlineColorService.shared.getBrandColors(for: flight.operatorIata)
                                 )
+
+                                // Airline profile section
+                                airlineProfileSection
                             }
-
-                            // Destination insights
-                            InsightCard(
-                                type: .destination,
-                                context: InsightContext(
-                                    destinationAirport: flight.destination.code,
-                                    destinationCity: flight.destination.city
-                                ),
-                                airlineColors: AirlineColorService.shared.getBrandColors(for: flight.operatorIata)
-                            )
-
-                            // Airline profile section
-                            airlineProfileSection
-                        }
-                        .padding()
-                    } else if viewModel.isLoading {
-                        LoadingView(flightNumber: flightNumber)
                             .padding()
-                    } else if let error = viewModel.error {
-                        FlightErrorView(
-                            flightNumber: flightNumber,
-                            errorMessage: error.localizedDescription,
-                            onRetry: {
-                                viewModel.searchFlight(flightNumber: flightNumber)
-                            },
-                            onBack: {
-                                dismiss()
-                            }
-                        )
-                        .padding()
+                        } else if viewModel.isLoading {
+                            LoadingView(flightNumber: flightNumber)
+                                .padding()
+                        } else if let error = viewModel.error {
+                            FlightErrorView(
+                                flightNumber: flightNumber,
+                                errorMessage: error.localizedDescription,
+                                onRetry: {
+                                    viewModel.searchFlight(flightNumber: flightNumber)
+                                },
+                                onBack: {
+                                    dismiss()
+                                }
+                            )
+                            .padding()
+                        }
                     }
+                    .frame(width: geometry.size.width)
                 }
+                .clipped()
             }
         }
         .navigationTitle("Flight Details")

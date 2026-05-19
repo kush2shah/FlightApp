@@ -25,17 +25,20 @@ struct RouteView: View {
                     .background(.ultraThinMaterial)
                     .ignoresSafeArea()
 
-                ScrollView(.vertical, showsIndicators: false) {
-                    VStack(spacing: 0) {
-                        if viewModel.isLoading {
-                            loadingView
-                        } else if let error = viewModel.error {
-                            errorView(error)
-                        } else {
-                            routeContentView
+                GeometryReader { geometry in
+                    ScrollView(.vertical, showsIndicators: false) {
+                        VStack(spacing: 0) {
+                            if viewModel.isLoading {
+                                loadingView
+                            } else if let error = viewModel.error {
+                                errorView(error)
+                            } else {
+                                routeContentView
+                            }
                         }
+                        .frame(width: geometry.size.width)
                     }
-                    .frame(maxWidth: .infinity)
+                    .clipped()
                 }
             }
             .navigationTitle("\(origin) → \(destination)")
