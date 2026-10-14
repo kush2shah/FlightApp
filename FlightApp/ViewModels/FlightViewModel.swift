@@ -20,6 +20,12 @@ class FlightViewModel: ObservableObject {
     var skipFlightSelection = false
     private var lastSearchedFlightNumber: String?
 
+    private let flightData: FlightDataProviding
+
+    init(flightData: FlightDataProviding? = nil) {
+        self.flightData = flightData ?? AeroAPIService.shared
+    }
+
     func searchFlightForDate(_ date: Date) {
         guard let flightNumber = lastSearchedFlightNumber else { return }
 
@@ -29,7 +35,7 @@ class FlightViewModel: ObservableObject {
         Task {
             do {
                 print("🔎 Re-searching for flight: \(flightNumber) on \(date)")
-                let flights = try await AeroAPIService.shared.getFlightInfo(flightNumber, startDate: date)
+                let flights = try await self.flightData.getFlightInfo(flightNumber, startDate: date)
                 print("✅ Found \(flights.count) flights")
 
                 await MainActor.run {
@@ -80,7 +86,7 @@ class FlightViewModel: ObservableObject {
         Task {
             do {
                 print("🔎 Searching for flight: \(flightNumber)")
-                let flights = try await AeroAPIService.shared.getFlightInfo(flightNumber)
+                let flights = try await self.flightData.getFlightInfo(flightNumber, startDate: nil)
                 print("✅ Found \(flights.count) flights")
 
                 await MainActor.run {

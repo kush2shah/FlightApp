@@ -39,6 +39,11 @@ enum AeroAPIError: LocalizedError {
 class AeroAPIService {
     static let shared = AeroAPIService()
     private let baseURL = "https://aeroapi.flightaware.com/aeroapi"
+    private let session: URLSession
+
+    init(session: URLSession = .shared) {
+        self.session = session
+    }
     
     private var apiKey: String {
         if let apiKey = Bundle.main.object(forInfoDictionaryKey: "AERO_API_KEY") as? String {
@@ -95,7 +100,7 @@ class AeroAPIService {
         print("🔍 API CALL ($0.005) - Fetching flight: \(url)")
 
         do {
-            let (data, urlResponse) = try await URLSession.shared.data(for: request)
+            let (data, urlResponse) = try await session.data(for: request)
 
             guard let httpResponse = urlResponse as? HTTPURLResponse else {
                 throw AeroAPIError.invalidResponse
@@ -196,7 +201,7 @@ class AeroAPIService {
         print("🗺️ API CALL ($0.010) - Fetching route for flight: \(faFlightId)")
 
         do {
-            let (data, urlResponse) = try await URLSession.shared.data(for: request)
+            let (data, urlResponse) = try await session.data(for: request)
 
             guard let httpResponse = urlResponse as? HTTPURLResponse else {
                 throw AeroAPIError.invalidResponse
@@ -320,7 +325,7 @@ class AeroAPIService {
         print("🛫 API CALL ($0.050 - EXPENSIVE!) - Fetching flights: \(cleanOrigin) → \(cleanDest)")
 
         do {
-            let (data, urlResponse) = try await URLSession.shared.data(for: request)
+            let (data, urlResponse) = try await session.data(for: request)
 
             guard let httpResponse = urlResponse as? HTTPURLResponse else {
                 throw AeroAPIError.invalidResponse
@@ -405,7 +410,7 @@ class AeroAPIService {
         print("🗺️ API CALL ($0.020) - Fetching route info: \(cleanOrigin) → \(cleanDest)")
 
         do {
-            let (data, urlResponse) = try await URLSession.shared.data(for: request)
+            let (data, urlResponse) = try await session.data(for: request)
 
             guard let httpResponse = urlResponse as? HTTPURLResponse else {
                 throw AeroAPIError.invalidResponse

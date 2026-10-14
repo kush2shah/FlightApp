@@ -45,6 +45,11 @@ enum SeatsAeroAPIError: LocalizedError {
 class SeatsAeroAPIService {
     static let shared = SeatsAeroAPIService()
     private let baseURL = "https://seats.aero/partnerapi"
+    private let session: URLSession
+
+    init(session: URLSession = .shared) {
+        self.session = session
+    }
 
     private var apiKey: String {
         if let apiKey = Bundle.main.object(forInfoDictionaryKey: "SEATS_AERO_API_KEY") as? String {
@@ -126,7 +131,7 @@ class SeatsAeroAPIService {
         print("🔑 [SEATS.AERO] API Key present: \(!apiKey.isEmpty)")
 
         do {
-            let (data, urlResponse) = try await URLSession.shared.data(for: request)
+            let (data, urlResponse) = try await session.data(for: request)
 
             guard let httpResponse = urlResponse as? HTTPURLResponse else {
                 print("❌ [SEATS.AERO] Invalid response type")

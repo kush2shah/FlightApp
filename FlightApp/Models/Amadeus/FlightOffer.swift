@@ -85,10 +85,12 @@ struct Itinerary: Codable {
 
     /// Human-readable duration (e.g., "2h 30m")
     var formattedDuration: String {
-        duration.replacingOccurrences(of: "PT", with: "")
-            .replacingOccurrences(of: "H", with: "h ")
-            .replacingOccurrences(of: "M", with: "m")
-            .trimmingCharacters(in: .whitespaces)
+        duration.formattedISO8601Duration
+    }
+
+    /// Duration in hours, or nil if Amadeus sent something unparseable
+    var durationHours: Double? {
+        duration.iso8601DurationHours
     }
 
     /// Departure airport
@@ -123,10 +125,7 @@ struct FlightSegment: Codable, Identifiable {
     }
 
     var formattedDuration: String {
-        duration.replacingOccurrences(of: "PT", with: "")
-            .replacingOccurrences(of: "H", with: "h ")
-            .replacingOccurrences(of: "M", with: "m")
-            .trimmingCharacters(in: .whitespaces)
+        duration.formattedISO8601Duration
     }
 }
 

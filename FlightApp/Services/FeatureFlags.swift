@@ -12,10 +12,10 @@ import SwiftUI
 class FeatureFlags: ObservableObject {
     static let shared = FeatureFlags()
 
-    @AppStorage("seatsAeroEnabled") var isSeatsAeroEnabled: Bool = true
-    @AppStorage("amadeusEnabled") var isAmadeusEnabled: Bool = true
-    @AppStorage("amadeusProduction") var isAmadeusProduction: Bool = false
-    @AppStorage("trackedFlightsEnabled") var isTrackedFlightsEnabled: Bool = false
+    @AppStorage var isSeatsAeroEnabled: Bool
+    @AppStorage var isAmadeusEnabled: Bool
+    @AppStorage var isAmadeusProduction: Bool
+    @AppStorage var isTrackedFlightsEnabled: Bool
 
     /// Check if Seats.aero API integration is enabled
     var canUseSeatsAero: Bool {
@@ -32,5 +32,11 @@ class FeatureFlags: ObservableObject {
         isTrackedFlightsEnabled
     }
 
-    private init() {}
+    /// - Parameter defaults: Backing store; tests pass an isolated suite.
+    init(defaults: UserDefaults = .standard) {
+        _isSeatsAeroEnabled = AppStorage(wrappedValue: true, "seatsAeroEnabled", store: defaults)
+        _isAmadeusEnabled = AppStorage(wrappedValue: true, "amadeusEnabled", store: defaults)
+        _isAmadeusProduction = AppStorage(wrappedValue: false, "amadeusProduction", store: defaults)
+        _isTrackedFlightsEnabled = AppStorage(wrappedValue: false, "trackedFlightsEnabled", store: defaults)
+    }
 }

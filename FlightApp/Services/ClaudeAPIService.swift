@@ -2,121 +2,158 @@
 //  ClaudeAPIService.swift
 //  FlightApp
 //
-//  Service for generating insights using Claude 4.5 Haiku
+//  Service for generating insights using Claude Haiku 4.5
 //
 
 import Foundation
+import OSLog
 
-class ClaudeAPIService {
-    static let shared = ClaudeAPIService()
+final class ClaudeAPIService {
+    /// Reads ANTHROPIC_KEY from Info.plist (populated by Config.xcconfig).
+    /// A missing key doesn't crash the app; insight requests throw `.missingAPIKey` instead.
+    static let shared = ClaudeAPIService(
+        apiKey: Bundle.main.object(forInfoDictionaryKey: "ANTHROPIC_KEY") as? String
+    )
 
-    private let apiKey: String
-    private let baseURL = "https://api.anthropic.com/v1/messages"
-    private let model = "claude-haiku-4-5-20251001"
-    private let maxTokens = 150 // Keep responses concise
+    static let endpoint = URL(string: "https://api.anthropic.com/v1/messages")!
+    static let apiVersion = "2023-06-01"
 
-    private init() {
-        // Load API key from Config.xcconfig
-        guard let key = Bundle.main.object(forInfoDictionaryKey: "ANTHROPIC_KEY") as? String,
-              !key.isEmpty else {
-            fatalError("ANTHROPIC_KEY not found in Config.xcconfig")
-        }
-        self.apiKey = key
+    private let apiKey: String?
+    private let session: URLSession
+    private let model: String
+    private let maxTokens: Int
+
+    init(
+        apiKey: String?,
+        session: URLSession = .shared,
+        model: String = "claude-haiku-4-5",
+        maxTokens: Int = 150 // Keep responses concise
+    ) {
+        let trimmed = apiKey?.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.apiKey = (trimmed?.isEmpty ?? true) ? nil : trimmed
+        self.session = session
+        self.model = model
+        self.maxTokens = maxTokens
     }
 
+    var isConfigured: Bool { apiKey != nil }
+
     /// Generate an insight using Claude
-    func generateInsight(
-        type: InsightType,
-        context: InsightContext
-    ) async throws -> String {
+    func generateInsight(type: InsightType, context: InsightContext) async throws -> String {
+        guard let apiKey else { throw ClaudeAPIError.missingAPIKey }
+
         let (systemPrompt, userPrompt) = ClaudePromptBuilder.buildPrompt(type: type, context: context)
+        Logger.claude.debug("Generating \(String(describing: type), privacy: .public) insight")
 
-        print("🤖 [Claude] Generating \(type) insight")
-        print("📝 [Claude] System: \(systemPrompt.prefix(100))...")
-        print("📝 [Claude] User: \(userPrompt.prefix(100))...")
-
-        let requestBody: [String: Any] = [
-            "model": model,
-            "max_tokens": maxTokens,
-            "system": systemPrompt,
-            "messages": [
-                [
-                    "role": "user",
-                    "content": userPrompt
-                ]
-            ]
-        ]
-
-        var request = URLRequest(url: URL(string: baseURL)!)
+        var request = URLRequest(url: Self.endpoint)
         request.httpMethod = "POST"
-        request.addValue(apiKey, forHTTPHeaderField: "x-api-key")
-        request.addValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
-        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
+        request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
+        request.setValue(Self.apiVersion, forHTTPHeaderField: "anthropic-version")
+        request.setValue("application/json", forHTTPHeaderField: "content-type")
+        request.httpBody = try JSONEncoder().encode(ClaudeRequest(
+            model: model,
+            maxTokens: maxTokens,
+            system: systemPrompt,
+            messages: [.init(role: "user", content: userPrompt)]
+        ))
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await session.data(for: request)
 
         guard let httpResponse = response as? HTTPURLResponse else {
-            print("❌ [Claude] No HTTP response")
-            throw ClaudeAPIError.requestFailed
-        }
-
-        // Log response details for debugging
-        print("📡 [Claude] HTTP Status: \(httpResponse.statusCode)")
-
-        if !(200...299).contains(httpResponse.statusCode) {
-            // Try to decode error response
-            if let errorString = String(data: data, encoding: .utf8) {
-                print("❌ [Claude] Error response: \(errorString)")
-            }
-            throw ClaudeAPIError.requestFailed
-        }
-
-        let decoded = try JSONDecoder().decode(ClaudeResponse.self, from: data)
-
-        guard let content = decoded.content.first,
-              content.type == "text" else {
             throw ClaudeAPIError.invalidResponse
         }
 
-        return content.text
+        guard (200...299).contains(httpResponse.statusCode) else {
+            let body = try? JSONDecoder().decode(ClaudeErrorResponse.self, from: data)
+            Logger.claude.error("HTTP \(httpResponse.statusCode, privacy: .public): \(body?.error.message ?? "no error body", privacy: .public)")
+            throw ClaudeAPIError.http(statusCode: httpResponse.statusCode, message: body?.error.message)
+        }
+
+        let decoded: ClaudeResponse
+        do {
+            decoded = try JSONDecoder().decode(ClaudeResponse.self, from: data)
+        } catch {
+            throw ClaudeAPIError.invalidResponse
+        }
+
+        if decoded.stopReason == "refusal" {
+            throw ClaudeAPIError.refused
+        }
+
+        let text = decoded.content
+            .filter { $0.type == "text" }
+            .compactMap(\.text)
+            .joined()
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard !text.isEmpty else { throw ClaudeAPIError.invalidResponse }
+        return text
     }
 }
 
-// MARK: - Response Models
+// MARK: - Request / Response Models
 
-struct ClaudeResponse: Codable {
-    let id: String
-    let type: String
-    let role: String
-    let content: [ClaudeContent]
+struct ClaudeRequest: Encodable {
+    struct Message: Encodable {
+        let role: String
+        let content: String
+    }
+
     let model: String
+    let maxTokens: Int
+    let system: String
+    let messages: [Message]
+
+    enum CodingKeys: String, CodingKey {
+        case model, system, messages
+        case maxTokens = "max_tokens"
+    }
+}
+
+struct ClaudeResponse: Decodable {
+    let content: [ClaudeContent]
     let stopReason: String?
 
     enum CodingKeys: String, CodingKey {
-        case id, type, role, content, model
+        case content
         case stopReason = "stop_reason"
     }
 }
 
-struct ClaudeContent: Codable {
+struct ClaudeContent: Decodable {
     let type: String
-    let text: String
+    let text: String?
 }
 
-enum ClaudeAPIError: Error, LocalizedError {
-    case requestFailed
-    case invalidResponse
+struct ClaudeErrorResponse: Decodable {
+    struct Detail: Decodable {
+        let type: String
+        let message: String
+    }
+
+    let error: Detail
+}
+
+enum ClaudeAPIError: Error, LocalizedError, Equatable {
     case missingAPIKey
+    case http(statusCode: Int, message: String?)
+    case invalidResponse
+    case refused
 
     var errorDescription: String? {
         switch self {
-        case .requestFailed:
-            return "Failed to get response from Claude API"
-        case .invalidResponse:
-            return "Received invalid response from Claude API"
         case .missingAPIKey:
             return "Anthropic API key not configured"
+        case .http(429, _):
+            return "Too many requests. Try again in a moment."
+        case .http(let statusCode, _) where statusCode >= 500:
+            return "Claude is temporarily unavailable. Try again later."
+        case .http(let statusCode, let message):
+            return message ?? "Claude request failed (\(statusCode))"
+        case .invalidResponse:
+            return "Received invalid response from Claude API"
+        case .refused:
+            return "Claude declined to generate this insight"
         }
     }
 }
