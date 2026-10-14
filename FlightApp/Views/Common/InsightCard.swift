@@ -15,7 +15,16 @@ struct InsightCard: View {
     @StateObject private var viewModel = InsightsViewModel()
     @State private var isExpanded: Bool = false
 
+    /// Insights are optional; without an Anthropic key the card isn't shown at all.
+    var isAvailable: Bool = ClaudeAPIService.shared.isConfigured
+
     var body: some View {
+        if isAvailable {
+            card
+        }
+    }
+
+    private var card: some View {
         VStack(alignment: .leading, spacing: 0) {
             // Header
             headerView

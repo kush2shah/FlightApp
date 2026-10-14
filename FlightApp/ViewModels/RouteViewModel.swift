@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import OSLog
 
 @MainActor
 class RouteViewModel: ObservableObject {
@@ -16,89 +17,45 @@ class RouteViewModel: ObservableObject {
     @Published var cashOffers: [FlightOffer] = []
     @Published var isLoadingCashPrices = false
     @Published var cashPriceLoadingProgress: Double = 0.0
-    @Published var cashPriceLoadingTotal: Int = 7
+    @Published private(set) var cashPriceLoadingTotal: Int = RouteViewModel.cashSearchDays
     @Published var cashPriceError: Error?
     @Published var isLoading = false
     @Published var error: String?
     @Published var originAirport: AeroAirport?
     @Published var destinationAirport: AeroAirport?
-    
-    // Expansion states for collapsed/expanded views
-    @Published var awardsExpanded = false
-    @Published var cashPricesExpanded = false
 
-    // Constants for collapsed view
-    let collapsedAwardCount = 5
-    let collapsedCashCount = 3
-    let maxBookingDaysAhead = 330 // Most airlines allow booking ~330-360 days out
+    /// Number of consecutive days searched for cash fares
+    static let cashSearchDays = 7
+    /// Itineraries longer than this are almost always long-layover connections
+    static let maxCashItineraryHours = 16.0
 
-    var shouldShowAwards: Bool {
-        FeatureFlags.shared.canUseSeatsAero
+    private let flightData: FlightDataProviding
+    private let awardSearch: AwardSearching
+    private let cashFares: CashFareSearching
+    private let featureFlags: FeatureFlags
+    private let now: () -> Date
+
+    private(set) var origin = ""
+    private(set) var destination = ""
+
+    init(
+        flightData: FlightDataProviding? = nil,
+        awardSearch: AwardSearching? = nil,
+        cashFares: CashFareSearching? = nil,
+        featureFlags: FeatureFlags? = nil,
+        now: @escaping () -> Date = Date.init
+    ) {
+        self.flightData = flightData ?? AeroAPIService.shared
+        self.awardSearch = awardSearch ?? SeatsAeroAPIService.shared
+        self.cashFares = cashFares ?? AmadeusAPIService.shared
+        self.featureFlags = featureFlags ?? .shared
+        self.now = now
     }
 
-    // Filtered awards based on user-selected filters
-    var filteredAwards: [AwardAvailability] {
-        var filtered = awards
+    // MARK: - Derived State
 
-        // Filter by cabin class
-        filtered = filtered.filter { award in
-            awardFilters.selectedCabins.contains { cabin in
-                award.isCabinAvailable(cabin)
-            }
-        }
-
-        // Filter by date range
-        filtered = filtered.filter { award in
-            guard let date = award.parsedDate else { return false }
-            return date >= awardFilters.dateRange.startDate && date <= awardFilters.dateRange.endDate
-        }
-
-        // Filter by mileage programs (if specific programs selected)
-        if !awardFilters.selectedPrograms.isEmpty {
-            filtered = filtered.filter { award in
-                awardFilters.selectedPrograms.contains { program in
-                    award.source.lowercased().contains(program.lowercased())
-                }
-            }
-        }
-
-        // Filter by max points (if set)
-        if let maxPoints = awardFilters.maxPoints {
-            filtered = filtered.filter { award in
-                guard let best = award.bestAvailableCabin() else { return false }
-                let costString = best.cost.replacingOccurrences(of: ",", with: "")
-                guard let cost = Int(costString) else { return false }
-                return cost <= maxPoints
-            }
-        }
-
-        return filtered
-    }
-    
-    // Best awards to show in collapsed view
-    var topAwards: [AwardAvailability] {
-        filteredAwards
-            .sorted { $0.valueScore() > $1.valueScore() }
-            .prefix(collapsedAwardCount)
-            .map { $0 }
-    }
-    
-    // Best cash offers to show in collapsed view
-    var topCashOffers: [FlightOffer] {
-        Array(cashOffers.prefix(collapsedCashCount))
-    }
-
-    // Smart recommendations - top 3 best value awards
-    var recommendedAwards: [AwardAvailability] {
-        filteredAwards
-            .sorted { $0.valueScore() > $1.valueScore() }
-            .prefix(3)
-            .map { $0 }
-    }
-
-    // All unique mileage programs in results (for filter UI)
-    var availablePrograms: [String] {
-        Array(Set(awards.map { $0.source })).sorted()
+    var showsCashFares: Bool {
+        featureFlags.canUseAmadeus
     }
 
     // Primary route to display (most frequently filed)
@@ -106,30 +63,83 @@ class RouteViewModel: ObservableObject {
         ifrRoutes.first
     }
 
-    // Aggregate all aircraft types from all routes
-    var commonAircraft: [String] {
-        let allAircraft = ifrRoutes.flatMap { $0.aircraftTypes }
-        let uniqueAircraft = Array(Set(allAircraft))
-        return Array(uniqueAircraft.prefix(8)) // Top 8
-            .compactMap { AircraftTypeService.shared.getAircraftName(from: $0) }
+    var hasRouteAirports: Bool {
+        originAirport != nil && destinationAirport != nil
     }
 
-    // Total flights filed across all routes
-    var totalFlightCount: String {
-        let total = ifrRoutes.reduce(0) { $0 + $1.count }
-        return total > 0 ? "\(total)" : ""
+    /// Nothing to show and nothing still loading
+    var isEmpty: Bool {
+        currentFlights.isEmpty && awards.isEmpty && cashOffers.isEmpty && !isLoading && !isLoadingCashPrices
     }
 
-    var hasAggregateStats: Bool {
-        !commonAircraft.isEmpty || !totalFlightCount.isEmpty
+    /// In-progress flights first, then by scheduled departure
+    var sortedFlights: [AeroFlight] {
+        currentFlights.sorted { lhs, rhs in
+            if lhs.isInProgress != rhs.isInProgress {
+                return lhs.isInProgress
+            }
+            switch (lhs.scheduledOut, rhs.scheduledOut) {
+            case let (l?, r?): return l < r
+            case (.some, .none): return true
+            default: return false
+            }
+        }
     }
+
+    /// Cabins with at least one award, in display order
+    var cabinsWithAwards: [CabinClass] {
+        [CabinClass.economy, .premiumEconomy, .business, .first].filter(hasAwardsForCabin)
+    }
+
+    func hasAwardsForCabin(_ cabin: CabinClass) -> Bool {
+        awards.contains { $0.isCabinAvailable(cabin) }
+    }
+
+    // MARK: - Insight Contexts
+
+    var awardInsightContext: InsightContext {
+        let offers = awards.flatMap(\.awardOffers)
+        return InsightContext(
+            awardData: offers.isEmpty ? nil : offers,
+            origin: origin,
+            destination: destination
+        )
+    }
+
+    var routeInsightContext: InsightContext {
+        var distance: Double?
+        if let originLat = originAirport?.latitude, let originLon = originAirport?.longitude,
+           let destLat = destinationAirport?.latitude, let destLon = destinationAirport?.longitude {
+            distance = GreatCircle.distanceMiles(
+                from: .init(latitude: originLat, longitude: originLon),
+                to: .init(latitude: destLat, longitude: destLon)
+            )
+        }
+
+        return InsightContext(
+            origin: origin,
+            destination: destination,
+            distance: distance,
+            destinationAirport: destination,
+            destinationCity: destinationAirport?.city
+        )
+    }
+
+    /// Brand colors of the first operating airline on the route
+    var airlineColors: AirlineBrandColors? {
+        guard let code = currentFlights.first?.operatorIata else { return nil }
+        return AirlineColorService.shared.getBrandColors(for: code)
+    }
+
+    // MARK: - Loading
 
     func loadRouteData(origin: String, destination: String) async {
+        self.origin = origin
+        self.destination = destination
         isLoading = true
         error = nil
 
         // Load critical data in parallel (route info, flights, awards)
-        // Cash prices load separately in background to not block UI
         await withTaskGroup(of: Void.self) { group in
             group.addTask { await self.loadRouteInfo(origin: origin, destination: destination) }
             group.addTask { await self.loadFlights(origin: origin, destination: destination) }
@@ -138,53 +148,46 @@ class RouteViewModel: ObservableObject {
 
         isLoading = false
 
-        // Load cash prices asynchronously after main content is ready
-        Task {
-            await loadCashPrices(origin: origin, destination: destination)
-        }
+        // Cash prices load after main content is shown. Awaiting here (rather than
+        // spawning a Task) keeps the work tied to the view's .task, so it's
+        // cancelled if the user leaves the route.
+        await loadCashPrices(origin: origin, destination: destination)
     }
 
     private func loadRouteInfo(origin: String, destination: String) async {
         do {
-            let routes = try await AeroAPIService.shared.getRouteInfo(
-                origin: origin,
-                destination: destination
-            )
-            ifrRoutes = routes
-            print("✅ Loaded \(routes.count) IFR routes")
+            ifrRoutes = try await flightData.getRouteInfo(origin: origin, destination: destination)
+            Logger.route.debug("Loaded \(self.ifrRoutes.count) IFR routes")
         } catch {
-            print("⚠️ Failed to load route info: \(error)")
-            // Don't set error - route info is optional
+            // Route info is optional
+            Logger.route.error("Failed to load route info: \(error.localizedDescription, privacy: .public)")
         }
     }
 
     private func loadFlights(origin: String, destination: String) async {
         do {
-            // COST OPTIMIZATION: Reduce time window from 36 hours to 18 hours
-            // Get flights from 6 hours ago to 12 hours from now
-            // This still captures en route and near-future flights while reducing API costs
-            let startDate = Calendar.current.date(byAdding: .hour, value: -6, to: Date()) ?? Date()
-            let endDate = Calendar.current.date(byAdding: .hour, value: 12, to: Date())
+            // COST OPTIMIZATION: 18-hour window (6 hours ago to 12 hours from now)
+            // still captures en route and near-future flights
+            let start = Calendar.current.date(byAdding: .hour, value: -6, to: now()) ?? now()
+            let end = Calendar.current.date(byAdding: .hour, value: 12, to: now())
 
-            let flights = try await AeroAPIService.shared.getFlightsBetweenAirports(
+            let flights = try await flightData.getFlightsBetweenAirports(
                 origin: origin,
                 destination: destination,
-                startDate: startDate,
-                endDate: endDate,
+                startDate: start,
+                endDate: end,
                 connection: "nonstop"
             )
             currentFlights = flights
 
-            // Store origin/destination airport info from first flight
             if let firstFlight = flights.first {
                 originAirport = firstFlight.origin
                 destinationAirport = firstFlight.destination
             }
-
-            print("✅ Loaded \(flights.count) flights (including \(flights.filter(\.isInProgress).count) en route)")
+            Logger.route.debug("Loaded \(flights.count) flights")
         } catch {
-            print("⚠️ Failed to load flights: \(error)")
-            // If this fails, show error since it's core functionality
+            // Flights are core functionality, so surface the failure
+            Logger.route.error("Failed to load flights: \(error.localizedDescription, privacy: .public)")
             if currentFlights.isEmpty {
                 self.error = "Could not load flights for this route"
             }
@@ -192,96 +195,48 @@ class RouteViewModel: ObservableObject {
     }
 
     private func loadAwards(origin: String, destination: String) async {
-        print("🎯 [AWARDS] Starting award search for \(origin) → \(destination)")
-
-        guard FeatureFlags.shared.canUseSeatsAero else {
-            print("ℹ️ [AWARDS] Seats.aero disabled, skipping award search")
-            return
-        }
+        guard featureFlags.canUseSeatsAero else { return }
 
         do {
-            // Convert ICAO to IATA if needed
-            let originIATA = SearchInputParser.shared.icaoToIata(origin)
-            let destIATA = SearchInputParser.shared.icaoToIata(destination)
-
-            print("🔄 [AWARDS] Converted codes: \(origin) → \(originIATA), \(destination) → \(destIATA)")
-
-            // Use date range from filter preferences
-            let startDate = awardFilters.dateRange.startDate
-            let endDate = awardFilters.dateRange.endDate
-
-            let dateFormatter = DateFormatter()
-            dateFormatter.dateFormat = "yyyy-MM-dd"
-            print("📅 [AWARDS] Date range: \(dateFormatter.string(from: startDate)) to \(dateFormatter.string(from: endDate))")
-
-            // Use cabin preferences for API search
-            let cabinsParam = awardFilters.cabinsParameter
-            print("💺 [AWARDS] Searching cabins: \(cabinsParam)")
-
-            let response = try await SeatsAeroAPIService.shared.searchAwards(
-                origin: originIATA,
-                destination: destIATA,
-                startDate: startDate,
-                endDate: endDate,
-                cabins: cabinsParam
+            let response = try await awardSearch.searchAwards(
+                origin: SearchInputParser.shared.icaoToIata(origin),
+                destination: SearchInputParser.shared.icaoToIata(destination),
+                startDate: awardFilters.dateRange.startDate,
+                endDate: awardFilters.dateRange.endDate,
+                cabins: awardFilters.cabinsParameter,
+                sources: nil
             )
             awards = response.data
-            print("✅ [AWARDS] Loaded \(response.data.count) award options (searching: \(cabinsParam))")
-
-            if response.data.isEmpty {
-                print("ℹ️ [AWARDS] No award availability found for this route/date range")
-            }
-        } catch SeatsAeroAPIError.featureDisabled {
-            print("ℹ️ [AWARDS] Seats.aero feature disabled by user")
-        } catch SeatsAeroAPIError.unauthorized {
-            print("❌ [AWARDS] API authentication failed - check API key")
-        } catch SeatsAeroAPIError.rateLimitExceeded {
-            print("⚠️ [AWARDS] Rate limit exceeded")
-        } catch SeatsAeroAPIError.noResultsFound {
-            print("ℹ️ [AWARDS] API returned no results (400 status)")
-        } catch SeatsAeroAPIError.serverError(let statusCode) {
-            print("❌ [AWARDS] Server error: \(statusCode)")
+            Logger.awards.debug("Loaded \(response.data.count) award options")
         } catch {
-            print("⚠️ [AWARDS] Failed to load awards: \(error)")
-            print("🔍 [AWARDS] Error details: \(error.localizedDescription)")
-            // Award data is optional, don't show error
+            // Award data is optional; SeatsAeroAPIError covers disabled, auth, rate limit, etc.
+            Logger.awards.error("Failed to load awards: \(error.localizedDescription, privacy: .public)")
         }
     }
 
     private func loadCashPrices(origin: String, destination: String) async {
-        print("💵 [AMADEUS] Starting cash price search for \(origin) → \(destination)")
-
-        guard FeatureFlags.shared.canUseAmadeus else {
-            print("ℹ️ [AMADEUS] Amadeus disabled, skipping cash price search")
-            return
-        }
+        guard featureFlags.canUseAmadeus else { return }
 
         isLoadingCashPrices = true
         cashPriceError = nil
-        cashPriceLoadingProgress = 0.0
-        cashPriceLoadingTotal = 7
+        cashPriceLoadingProgress = 0
 
-        // Convert ICAO to IATA if needed
         let originIATA = SearchInputParser.shared.icaoToIata(origin)
         let destIATA = SearchInputParser.shared.icaoToIata(destination)
 
-        print("🔄 [AMADEUS] Converted codes: \(origin) → \(originIATA), \(destination) → \(destIATA)")
-
-        // Use actual system date - let the API tell us if it's too far out
-        let baseDate = Date()
         let dateFormatter = DateFormatter()
+        dateFormatter.locale = Locale(identifier: "en_US_POSIX")
         dateFormatter.dateFormat = "yyyy-MM-dd"
 
-        print("📅 [AMADEUS] Searching from: \(dateFormatter.string(from: baseDate))")
-
-        // Search next 7 days
         var allOffers: [FlightOffer] = []
+        let baseDate = now()
 
-        for dayOffset in 0..<7 {
+        // Sequential on purpose: AmadeusAPIService rate-limits to ~10 req/sec
+        for dayOffset in 0..<Self.cashSearchDays {
+            guard !Task.isCancelled else { break }
             guard let searchDate = Calendar.current.date(byAdding: .day, value: dayOffset, to: baseDate) else {
                 continue
             }
-
             let dateString = dateFormatter.string(from: searchDate)
 
             let params = AmadeusAPIService.FlightSearchParams(
@@ -294,108 +249,37 @@ class RouteViewModel: ObservableObject {
             )
 
             do {
-                let offers = try await AmadeusAPIService.shared.searchFlightOffers(params: params)
-                allOffers.append(contentsOf: offers)
-                print("✅ [AMADEUS] Found \(offers.count) offers for \(dateString)")
+                allOffers += try await cashFares.searchFlightOffers(params: params)
             } catch {
-                print("⚠️ [AMADEUS] No offers for \(dateString): \(error)")
-                // Continue to next date instead of failing completely
+                // Keep going; one empty day shouldn't hide the rest
+                Logger.cashFares.debug("No offers for \(dateString, privacy: .public): \(error.localizedDescription, privacy: .public)")
             }
 
-            // Update progress after each API call
             cashPriceLoadingProgress = Double(dayOffset + 1)
         }
 
-        // Filter out unreasonably long itineraries (>2x typical nonstop duration)
-        // For transatlantic routes like JFK-LHR, nonstop is ~7-8hrs, so filter >16hrs
-        let filteredOffers = allOffers.filter { offer in
-            guard let duration = offer.outbound?.duration else { return true }
-            // Extract hours from ISO 8601 duration (e.g., "PT7H30M" → 7.5)
-            let hours = parseDurationHours(duration)
-            return hours < 16  // Filter out multi-stop itineraries with long layovers
-        }
-
-        // Smart sorting: prioritize nonstop, then duration, then price
-        cashOffers = filteredOffers.sorted { offer1, offer2 in
-            // 1. Prioritize nonstop flights
-            if offer1.numberOfStops != offer2.numberOfStops {
-                return offer1.numberOfStops < offer2.numberOfStops
-            }
-
-            // 2. For same number of stops, prioritize shorter duration
-            let duration1 = offer1.outbound?.duration ?? "PT99H"
-            let duration2 = offer2.outbound?.duration ?? "PT99H"
-            if duration1 != duration2 {
-                return duration1 < duration2
-            }
-
-            // 3. Finally, sort by price
-            return offer1.totalPrice < offer2.totalPrice
-        }
-
+        cashOffers = Self.rankCashOffers(allOffers)
         if cashOffers.isEmpty {
-            print("⚠️ [AMADEUS] No valid offers found")
             cashPriceError = NSError(domain: "FlightApp", code: 404, userInfo: [NSLocalizedDescriptionKey: "No flights available for these dates"])
-        } else {
-            print("✅ [AMADEUS] Loaded \(cashOffers.count) cash price options (sorted by stops → duration → price)")
         }
 
         isLoadingCashPrices = false
     }
 
-    // Helper to parse ISO 8601 duration to hours
-    private func parseDurationHours(_ duration: String) -> Double {
-        // Parse "PT7H30M" format
-        var result = 0.0
-        let components = duration.replacingOccurrences(of: "PT", with: "")
-
-        if let hRange = components.range(of: "H") {
-            let hours = String(components[..<hRange.lowerBound])
-            result += Double(hours) ?? 0
-        }
-
-        if let mRange = components.range(of: "M") {
-            var minuteStr = components
-            if let hRange = components.range(of: "H") {
-                minuteStr = String(components[hRange.upperBound..<mRange.lowerBound])
-            } else {
-                minuteStr = String(components[..<mRange.lowerBound])
-            }
-            let minutes = Double(minuteStr) ?? 0
-            result += minutes / 60.0
-        }
-
-        return result
-    }
-
-    // Get route info for booking URLs
-
-    // Get best award for a specific cabin class
-    func bestAwardForCabin(_ cabin: CabinClass) -> AwardAvailability? {
-        awards
-            .filter { $0.isCabinAvailable(cabin) }
-            .min(by: { award1, award2 in
-                guard let cost1String = award1.getMileageCost(for: cabin),
-                      let cost2String = award2.getMileageCost(for: cabin) else {
-                    return false
+    /// Drops long-layover itineraries, then orders by stops, duration, and price.
+    static func rankCashOffers(_ offers: [FlightOffer]) -> [FlightOffer] {
+        offers
+            .filter { ($0.outbound?.durationHours ?? 0) < maxCashItineraryHours }
+            .sorted { lhs, rhs in
+                if lhs.numberOfStops != rhs.numberOfStops {
+                    return lhs.numberOfStops < rhs.numberOfStops
                 }
-                // Remove commas and convert to int for comparison
-                let cost1 = Int(cost1String.replacingOccurrences(of: ",", with: "")) ?? Int.max
-                let cost2 = Int(cost2String.replacingOccurrences(of: ",", with: "")) ?? Int.max
-                return cost1 < cost2
-            })
-    }
-
-    // Check if any awards are available for a specific cabin
-    func hasAwardsForCabin(_ cabin: CabinClass) -> Bool {
-        awards.contains { $0.isCabinAvailable(cabin) }
-    }
-
-    func getRouteInfo() -> (origin: String, destination: String)? {
-        guard let origin = originAirport?.codeIata ?? originAirport?.codeIcao,
-              let destination = destinationAirport?.codeIata ?? destinationAirport?.codeIcao else {
-            return nil
-        }
-        return (origin, destination)
+                let lhsHours = lhs.outbound?.durationHours ?? .infinity
+                let rhsHours = rhs.outbound?.durationHours ?? .infinity
+                if lhsHours != rhsHours {
+                    return lhsHours < rhsHours
+                }
+                return lhs.totalPrice < rhs.totalPrice
+            }
     }
 }

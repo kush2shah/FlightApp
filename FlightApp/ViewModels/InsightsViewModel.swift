@@ -7,6 +7,7 @@
 
 import Foundation
 import SwiftUI
+import OSLog
 
 @MainActor
 class InsightsViewModel: ObservableObject {
@@ -14,8 +15,16 @@ class InsightsViewModel: ObservableObject {
     @Published var isLoading: Bool = false
     @Published var error: Error?
 
-    private let apiService = ClaudeAPIService.shared
-    private let cacheService = InsightsCacheService.shared
+    private let generator: InsightGenerating
+    private let cache: InsightCaching
+
+    init(
+        generator: InsightGenerating = ClaudeAPIService.shared,
+        cache: InsightCaching = InsightsCacheService.shared
+    ) {
+        self.generator = generator
+        self.cache = cache
+    }
 
     /// Generate insight with hybrid approach:
     /// 1. Check cache first
@@ -23,7 +32,7 @@ class InsightsViewModel: ObservableObject {
     /// 3. If not cached, load and cache result
     func loadInsight(type: InsightType, context: InsightContext, forceRefresh: Bool = false) async {
         // Check cache first unless force refresh
-        if !forceRefresh, let cached = cacheService.getCachedInsight(type: type, context: context) {
+        if !forceRefresh, let cached = cache.getCachedInsight(type: type, context: context) {
             self.insight = cached
             return
         }
@@ -33,15 +42,15 @@ class InsightsViewModel: ObservableObject {
         error = nil
 
         do {
-            let generatedInsight = try await apiService.generateInsight(type: type, context: context)
+            let generatedInsight = try await generator.generateInsight(type: type, context: context)
 
             // Cache the result
-            cacheService.cacheInsight(generatedInsight, type: type, context: context)
+            cache.cacheInsight(generatedInsight, type: type, context: context)
 
             self.insight = generatedInsight
         } catch {
             self.error = error
-            print("Failed to generate insight: \(error.localizedDescription)")
+            Logger.claude.error("Failed to generate insight: \(error.localizedDescription, privacy: .public)")
         }
 
         isLoading = false
