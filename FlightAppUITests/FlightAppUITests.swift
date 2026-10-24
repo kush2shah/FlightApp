@@ -31,6 +31,12 @@ final class FlightAppUITests: XCTestCase {
 
         XCTAssertTrue(app.staticTexts["Welcome to"].waitForExistence(timeout: 10))
         XCUIDevice.shared.orientation = .landscapeLeft
+        let landscape = NSPredicate { _, _ in
+            let frame = app.windows.firstMatch.frame
+            return frame.width > frame.height
+        }
+        expectation(for: landscape, evaluatedWith: nil)
+        waitForExpectations(timeout: 10)
         let scroll = app.scrollViews.firstMatch
         XCTAssertTrue(scroll.waitForExistence(timeout: 5))
         for _ in 0..<6 {
@@ -40,7 +46,7 @@ final class FlightAppUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Privacy First"].isHittable,
                       "The header must not consume the feature list's entire height")
         XCTAssertTrue(app.buttons["Continue"].isHittable)
-        let attachment = XCTAttachment(screenshot: app.screenshot())
+        let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
         attachment.name = "onboarding-landscape"
         attachment.lifetime = .keepAlways
         add(attachment)
