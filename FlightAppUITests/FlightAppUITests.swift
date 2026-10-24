@@ -23,6 +23,32 @@ final class FlightAppUITests: XCTestCase {
     }
 
     @MainActor
+    func testOnboardingFeaturesRemainReachableInLandscape() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-hasCompletedOnboarding", "NO"]
+        app.launch()
+        defer { XCUIDevice.shared.orientation = .portrait }
+
+        XCTAssertTrue(app.staticTexts["Welcome to"].waitForExistence(timeout: 10))
+        XCUIDevice.shared.orientation = .landscapeLeft
+        let scroll = app.scrollViews.firstMatch
+        XCTAssertTrue(scroll.waitForExistence(timeout: 5))
+        for _ in 0..<6 {
+            if app.staticTexts["Privacy First"].isHittable { break }
+            scroll.swipeUp()
+        }
+        XCTAssertTrue(app.staticTexts["Privacy First"].isHittable,
+                      "The header must not consume the feature list's entire height")
+        XCTAssertTrue(app.buttons["Continue"].isHittable)
+        let attachment = XCTAttachment(screenshot: app.screenshot())
+        attachment.name = "onboarding-landscape"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+        app.buttons["Continue"].tap()
+        XCTAssertTrue(app.staticTexts["Track a flight"].waitForExistence(timeout: 5))
+    }
+
+    @MainActor
     func testExample() throws {
         // UI tests must launch the application that they test.
         let app = XCUIApplication()
